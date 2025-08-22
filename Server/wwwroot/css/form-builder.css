@@ -21,7 +21,7 @@
         background-color: #e9ecef;
     }
 
-    .draggable-field .toolbox-preview {
+    .toolbox-preview {
         display: none;
         position: fixed;
         top: 0;
