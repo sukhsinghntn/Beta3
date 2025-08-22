@@ -2,5 +2,5 @@ namespace DynamicFormsApp.Shared.Models;
 
 public static class AppInfo
 {
-public const string Version = "0.9.9";
+public const string Version = "0.9.10";
 }

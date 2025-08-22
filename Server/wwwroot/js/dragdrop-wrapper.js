@@ -96,15 +96,17 @@ window.initToolboxPreview = () => {
         const preview = el.querySelector('.toolbox-preview');
         if (!preview) return;
 
+        const offset = 4;
+
         el.addEventListener('mouseenter', e => {
             preview.style.display = 'block';
-            preview.style.top = (e.clientY + 10) + 'px';
-            preview.style.left = (e.clientX + 10) + 'px';
+            preview.style.top = (e.clientY + offset) + 'px';
+            preview.style.left = (e.clientX + offset) + 'px';
         });
 
         el.addEventListener('mousemove', e => {
-            preview.style.top = (e.clientY + 10) + 'px';
-            preview.style.left = (e.clientX + 10) + 'px';
+            preview.style.top = (e.clientY + offset) + 'px';
+            preview.style.left = (e.clientX + offset) + 'px';
         });
 
         el.addEventListener('mouseleave', () => {
