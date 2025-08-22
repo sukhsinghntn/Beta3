@@ -99,6 +99,7 @@ window.initToolboxPreview = () => {
         const offset = 4;
 
         el.addEventListener('mouseenter', e => {
+            document.body.appendChild(preview);
             preview.style.display = 'block';
             preview.style.top = (e.clientY + offset) + 'px';
             preview.style.left = (e.clientX + offset) + 'px';
