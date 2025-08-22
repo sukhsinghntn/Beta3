@@ -5,6 +5,7 @@
 @using DynamicFormsApp.Client.Components
 @using DynamicFormsApp.Shared
 @using DynamicFormsApp.Shared.Models
+@using Microsoft.JSInterop
 @inject IJSRuntime JS
 @inject HttpClient Http
 @inject NavigationManager Navigation
@@ -316,6 +317,7 @@ else
             {
                 await JS.InvokeVoidAsync("initSortable", $"#section-{i}-rows", objRef);
             }
+            await JS.InvokeAsync<IJSObjectReference>("import", $"/js/dragdrop-wrapper.js?v={AppInfo.Version}");
             await JS.InvokeVoidAsync("initFieldDragDrop", "#sections-container", objRef);
             await JS.InvokeVoidAsync("initToolboxPreview");
         }
