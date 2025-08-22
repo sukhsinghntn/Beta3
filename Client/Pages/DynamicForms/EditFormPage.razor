@@ -60,6 +60,7 @@ else if (!string.IsNullOrEmpty(deletedMessage))
                 <div class="draggable-field" draggable="true" data-type="scale"><span class="material-icons me-1">linear_scale</span> Linear Scale</div>
                 <div class="draggable-field" draggable="true" data-type="grid_radio"><span class="material-icons me-1">grid_on</span> Choice Grid</div>
                 <div class="draggable-field" draggable="true" data-type="grid_checkbox"><span class="material-icons me-1">grid_view</span> Checkbox Grid</div>
+                <div class="draggable-field" draggable="true" data-type="grid_text"><span class="material-icons me-1">table_chart</span> Text Grid</div>
                 <div class="draggable-field" draggable="true" data-type="file"><span class="material-icons me-1">upload_file</span> Upload File</div>
                 <div class="draggable-field" draggable="true" data-type="image"><span class="material-icons me-1">image</span> Image</div>
                 <div class="draggable-field" draggable="true" data-type="statictext"><span class="material-icons me-1">text_fields</span> Text</div>
@@ -614,6 +615,7 @@ List<object> BuildFieldPayload()
                 var rowsList = f.GridRows.Where(o => !string.IsNullOrWhiteSpace(o)).ToList();
                 var colsList = f.GridColumns.Where(o => !string.IsNullOrWhiteSpace(o)).ToList();
                 string? optionsJson = opts.Count > 0 ? JsonSerializer.Serialize(opts)
+                    : f.FieldType == "grid_text" && colsList.Count > 0 ? JsonSerializer.Serialize(new { Columns = colsList })
                     : rowsList.Count > 0 || colsList.Count > 0 ? JsonSerializer.Serialize(new { Rows = rowsList, Columns = colsList })
                     : f.FieldType == "scale" ? JsonSerializer.Serialize(new { Min = f.ScaleMin, Max = f.ScaleMax })
                     : !string.IsNullOrWhiteSpace(f.Instructions) ? JsonSerializer.Serialize(new { Instructions = f.Instructions })
@@ -710,7 +712,18 @@ List<object> BuildFieldPayload()
                 {
                     try
                     {
-                        field.OptionItems = JsonSerializer.Deserialize<List<string>>(f.OptionsJson) ?? new();
+                        var optsDoc = JsonDocument.Parse(f.OptionsJson);
+                        if (optsDoc.RootElement.ValueKind == JsonValueKind.Array)
+                        {
+                            field.OptionItems = optsDoc.RootElement.EnumerateArray().Select(e => e.GetString() ?? string.Empty).ToList();
+                        }
+                        else if (optsDoc.RootElement.ValueKind == JsonValueKind.Object)
+                        {
+                            if (optsDoc.RootElement.TryGetProperty("Rows", out var rowsEl) && rowsEl.ValueKind == JsonValueKind.Array)
+                                field.GridRows = rowsEl.EnumerateArray().Select(e => e.GetString() ?? string.Empty).ToList();
+                            if (optsDoc.RootElement.TryGetProperty("Columns", out var colsEl) && colsEl.ValueKind == JsonValueKind.Array)
+                                field.GridColumns = colsEl.EnumerateArray().Select(e => e.GetString() ?? string.Empty).ToList();
+                        }
                     }
                     catch { }
                 }
@@ -775,6 +788,16 @@ List<object> BuildFieldPayload()
                     Severity = NotificationSeverity.Warning,
                     Summary = "Options Required",
                     Detail = $"Add at least one row and column for '{f.Label}'."
+                });
+                return;
+            }
+            if (f.FieldType == "grid_text" && !f.GridColumns.Any(c => !string.IsNullOrWhiteSpace(c)))
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "Options Required",
+                    Detail = $"Add at least one column for '{f.Label}'."
                 });
                 return;
             }
