@@ -574,6 +574,7 @@ else
         if (comp != null)
         {
             customComponents.Add(comp);
+            await DialogService.Alert("This component will be available across your department.", "Component Saved");
             StateHasChanged();
         }
     }
@@ -581,12 +582,19 @@ else
     async Task DeleteComponent(int id)
     {
         if (currentUser == null) return;
-        await ComponentService.Delete(id, currentUser.UserName);
-        var match = customComponents.FirstOrDefault(c => c.Id == id);
-        if (match != null)
+        bool? confirm = await DialogService.Confirm(
+            "Are you sure you want to delete this component? It will be removed for everyone in your department.",
+            "Delete Component",
+            new ConfirmOptions { OkButtonText = "Yes", CancelButtonText = "No" });
+        if (confirm == true)
         {
-            customComponents.Remove(match);
-            StateHasChanged();
+            await ComponentService.Delete(id, currentUser.UserName);
+            var match = customComponents.FirstOrDefault(c => c.Id == id);
+            if (match != null)
+            {
+                customComponents.Remove(match);
+                StateHasChanged();
+            }
         }
     }
 
