@@ -88,3 +88,30 @@ window.focusLastInput = (container) => {
 window.triggerClick = (el) => {
     if (el) el.click();
 };
+
+window.initToolboxPreview = () => {
+    document.querySelectorAll('.draggable-field').forEach(el => {
+        if (el.dataset.previewInit === 'true') return;
+        el.dataset.previewInit = 'true';
+        const preview = el.querySelector('.toolbox-preview');
+        if (!preview) return;
+
+        const offset = 4;
+
+        el.addEventListener('mouseenter', e => {
+            document.body.appendChild(preview);
+            preview.style.display = 'block';
+            preview.style.top = (e.clientY + offset) + 'px';
+            preview.style.left = (e.clientX + offset) + 'px';
+        });
+
+        el.addEventListener('mousemove', e => {
+            preview.style.top = (e.clientY + offset) + 'px';
+            preview.style.left = (e.clientX + offset) + 'px';
+        });
+
+        el.addEventListener('mouseleave', () => {
+            preview.style.display = 'none';
+        });
+    });
+};

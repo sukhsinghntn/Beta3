@@ -2,31 +2,27 @@
 @using System.Net.Http.Json
 @using System.Text.Json
 @using System.Collections.Generic
+@using System.Linq
 @using DynamicFormsApp.Client.Components
+@using DynamicFormsApp.Client.Services
 @using DynamicFormsApp.Shared
 @using DynamicFormsApp.Shared.Models
+@using Microsoft.JSInterop
 @inject IJSRuntime JS
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject CookieHelper CookieHelper
 @inject IUserService UserService
+@inject ComponentServiceProxy ComponentService
 
 @implements IDisposable
 
 <NavigationLock OnBeforeInternalNavigation="PromptDraft" ConfirmExternalNavigation="true" />
 
-<h2 class="mb-2">Form Builder</h2>
-<p class="text-muted">Drag fields to reorder or move them between rows. Each row can have up to four columns.</p>
-
-@if (isPreviewMode)
-{
-    <div class="mb-3">
-        <button class="btn btn-secondary btn-sm" @onclick="TogglePreview">Building</button>
-    </div>
-}
-
 @if (!isPreviewMode)
 {
+    <h2 class="mb-2">Form Builder</h2>
+    <p class="text-muted">Drag fields to reorder or move them between rows. Each row can have up to four columns.</p>
     <div class="row">
         <div class="col-md-3" style="position:sticky;top:75px;max-height:calc(100vh - 90px);overflow-y:auto;">
             <div class="mb-3 d-flex align-items-center gap-2">
@@ -42,26 +38,163 @@
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2">
-                <div class="draggable-field" draggable="true" data-type="text"><span class="material-icons me-1">short_text</span> Short Answer</div>
-                <div class="draggable-field" draggable="true" data-type="textarea"><span class="material-icons me-1">notes</span> Paragraph</div>
-                <div class="draggable-field" draggable="true" data-type="radio"><span class="material-icons me-1">radio_button_checked</span> Multiple Choice</div>
-                <div class="draggable-field" draggable="true" data-type="checkbox"><span class="material-icons me-1">check_box</span> Checkbox</div>
-                <div class="draggable-field" draggable="true" data-type="dropdown"><span class="material-icons me-1">arrow_drop_down_circle</span> Dropdown</div>
-                <div class="draggable-field" draggable="true" data-type="date"><span class="material-icons me-1">event</span> Date</div>
-                <div class="draggable-field" draggable="true" data-type="time"><span class="material-icons me-1">schedule</span> Time</div>
-                <div class="draggable-field" draggable="true" data-type="datetime"><span class="material-icons me-1">event_available</span> Date Time</div>
-                <div class="draggable-field" draggable="true" data-type="scale"><span class="material-icons me-1">linear_scale</span> Linear Scale</div>
-                <div class="draggable-field" draggable="true" data-type="grid_radio"><span class="material-icons me-1">grid_on</span> Choice Grid</div>
-                <div class="draggable-field" draggable="true" data-type="grid_checkbox"><span class="material-icons me-1">grid_view</span> Checkbox Grid</div>
-                <div class="draggable-field" draggable="true" data-type="file"><span class="material-icons me-1">upload_file</span> Upload File</div>
-                <div class="draggable-field" draggable="true" data-type="image"><span class="material-icons me-1">image</span> Image</div>
-                <div class="draggable-field" draggable="true" data-type="statictext"><span class="material-icons me-1">text_fields</span> Text</div>
+                <div class="draggable-field" draggable="true" data-type="text">
+                    <span class="material-icons me-1">short_text</span> Short Answer
+                    <div class="toolbox-preview"><input class="form-control" placeholder="Short answer" disabled /></div>
+                </div>
+                <div class="draggable-field" draggable="true" data-type="textarea">
+                    <span class="material-icons me-1">notes</span> Paragraph
+                    <div class="toolbox-preview"><textarea class="form-control" placeholder="Paragraph" disabled></textarea></div>
+                </div>
+                <div class="draggable-field" draggable="true" data-type="radio">
+                    <span class="material-icons me-1">radio_button_checked</span> Multiple Choice
+                    <div class="toolbox-preview">
+                        <div class="form-check"><input class="form-check-input" type="radio" disabled /><label class="form-check-label">Option</label></div>
+                    </div>
+                </div>
+                <div class="draggable-field" draggable="true" data-type="checkbox">
+                    <span class="material-icons me-1">check_box</span> Checkbox
+                    <div class="toolbox-preview">
+                        <div class="form-check"><input class="form-check-input" type="checkbox" disabled /><label class="form-check-label">Option</label></div>
+                    </div>
+                </div>
+                <div class="draggable-field" draggable="true" data-type="dropdown">
+                    <span class="material-icons me-1">arrow_drop_down_circle</span> Dropdown
+                    <div class="toolbox-preview"><select class="form-select" disabled><option>Option</option></select></div>
+                </div>
+                <div class="draggable-field" draggable="true" data-type="date">
+                    <span class="material-icons me-1">event</span> Date
+                    <div class="toolbox-preview"><input type="date" class="form-control" disabled /></div>
+                </div>
+                <div class="draggable-field" draggable="true" data-type="time">
+                    <span class="material-icons me-1">schedule</span> Time
+                    <div class="toolbox-preview"><input type="time" class="form-control" disabled /></div>
+                </div>
+                <div class="draggable-field" draggable="true" data-type="datetime">
+                    <span class="material-icons me-1">event_available</span> Date Time
+                    <div class="toolbox-preview"><input type="datetime-local" class="form-control" disabled /></div>
+                </div>
+                <div class="draggable-field" draggable="true" data-type="scale">
+                    <span class="material-icons me-1">linear_scale</span> Linear Scale
+                    <div class="toolbox-preview">
+                        <div class="d-flex gap-1">
+                            @for (var i = 1; i <= 5; i++)
+                            {
+                                <div class="form-check form-check-inline"><input class="form-check-input" type="radio" disabled /><label class="form-check-label">@i</label></div>
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="draggable-field" draggable="true" data-type="grid_radio">
+                    <span class="material-icons me-1">grid_on</span> Choice Grid
+                    <div class="toolbox-preview">
+                        <table class="table table-bordered table-sm mb-0"><thead><tr><th></th><th>A</th></tr></thead><tbody><tr><th scope="row">1</th><td><input type="radio" disabled /></td></tr></tbody></table>
+                    </div>
+                </div>
+                <div class="draggable-field" draggable="true" data-type="grid_checkbox">
+                    <span class="material-icons me-1">grid_view</span> Checkbox Grid
+                    <div class="toolbox-preview">
+                        <table class="table table-bordered table-sm mb-0"><thead><tr><th></th><th>A</th></tr></thead><tbody><tr><th scope="row">1</th><td><input type="checkbox" disabled /></td></tr></tbody></table>
+                    </div>
+                </div>
+                <div class="draggable-field" draggable="true" data-type="grid_text">
+                    <span class="material-icons me-1">table_chart</span> Text Grid
+                    <div class="toolbox-preview">
+                        <table class="table table-bordered table-sm mb-0"><thead><tr><th>A</th></tr></thead><tbody><tr><td><input class="form-control" disabled /></td></tr></tbody></table>
+                    </div>
+                </div>
+                <div class="draggable-field" draggable="true" data-type="file">
+                    <span class="material-icons me-1">upload_file</span> Upload File
+                    <div class="toolbox-preview"><input type="file" class="form-control" disabled /></div>
+                </div>
+                <div class="draggable-field" draggable="true" data-type="image">
+                    <span class="material-icons me-1">image</span> Image
+                    <div class="toolbox-preview"><img src="/images/logo.png" style="max-width:100px" /></div>
+                </div>
+                <div class="draggable-field" draggable="true" data-type="statictext">
+                    <span class="material-icons me-1">text_fields</span> Text
+                    <div class="toolbox-preview"><p class="m-0">Sample text</p></div>
+                </div>
             </div>
+            @if (customComponents.Any())
+            {
+                <h6 class="mt-3">Saved Components</h6>
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach (var comp in customComponents)
+                    {
+                        var field = comp.Field;
+                        <div class="draggable-field position-relative" draggable="true" data-type="component-@comp.Id">
+                            <span class="material-icons me-1">view_module</span> @comp.Name
+                            @if (comp.CreatedBy == currentUser?.UserName)
+                            {
+                                <button class="btn btn-link btn-sm text-danger position-absolute top-0 end-0" title="Delete" @onclick="() => DeleteComponent(comp.Id)">
+                                    <span class="material-icons" style="font-size:16px">delete</span>
+                                </button>
+                            }
+                            <div class="toolbox-preview">
+                                @if (field?.FieldType == "radio")
+                                {
+                                    foreach (var opt in field.OptionItems.Take(1))
+                                    {
+                                        <div class="form-check"><input class="form-check-input" type="radio" disabled /><label class="form-check-label">@opt</label></div>
+                                    }
+                                }
+                                else if (field?.FieldType == "checkbox")
+                                {
+                                    foreach (var opt in field.OptionItems.Take(1))
+                                    {
+                                        <div class="form-check"><input class="form-check-input" type="checkbox" disabled /><label class="form-check-label">@opt</label></div>
+                                    }
+                                }
+                                else if (field?.FieldType == "dropdown")
+                                {
+                                    <select class="form-select" disabled>
+                                        @foreach (var opt in field.OptionItems.Take(1))
+                                        {
+                                            <option>@opt</option>
+                                        }
+                                    </select>
+                                }
+                                else if (field?.FieldType == "grid_radio")
+                                {
+                                    <table class="table table-bordered table-sm mb-0">
+                                        <thead><tr><th></th>@foreach(var c in field.GridColumns.Take(1)){<th>@c</th>}</tr></thead>
+                                        <tbody>@foreach(var r in field.GridRows.Take(1)){<tr><th scope="row">@r</th><td><input type="radio" disabled /></td></tr>}</tbody>
+                                    </table>
+                                }
+                                else if (field?.FieldType == "grid_checkbox")
+                                {
+                                    <table class="table table-bordered table-sm mb-0">
+                                        <thead><tr><th></th>@foreach(var c in field.GridColumns.Take(1)){<th>@c</th>}</tr></thead>
+                                        <tbody>@foreach(var r in field.GridRows.Take(1)){<tr><th scope="row">@r</th><td><input type="checkbox" disabled /></td></tr>}</tbody>
+                                    </table>
+                                }
+                                else if (field?.FieldType == "grid_text")
+                                {
+                                    <table class="table table-bordered table-sm mb-0">
+                                        <thead><tr>@foreach(var c in field.GridColumns.Take(1)){<th>@c</th>}</tr></thead>
+                                        <tbody><tr><td><input class="form-control" disabled /></td></tr></tbody>
+                                    </table>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
             <h6 class="mt-3">User Fields</h6>
             <div class="d-flex flex-wrap gap-2">
-                <div class="draggable-field" draggable="true" data-type="user"><span class="material-icons me-1">person</span> User Dropdown</div>
-                <div class="draggable-field" draggable="true" data-type="department"><span class="material-icons me-1">apartment</span> Department Dropdown</div>
-                <div class="draggable-field" draggable="true" data-type="location"><span class="material-icons me-1">location_on</span> Location Dropdown</div>
+                <div class="draggable-field" draggable="true" data-type="user">
+                    <span class="material-icons me-1">person</span> User Dropdown
+                    <div class="toolbox-preview"><select class="form-select" disabled><option>User</option></select></div>
+                </div>
+                <div class="draggable-field" draggable="true" data-type="department">
+                    <span class="material-icons me-1">apartment</span> Department Dropdown
+                    <div class="toolbox-preview"><select class="form-select" disabled><option>Department</option></select></div>
+                </div>
+                <div class="draggable-field" draggable="true" data-type="location">
+                    <span class="material-icons me-1">location_on</span> Location Dropdown
+                    <div class="toolbox-preview"><select class="form-select" disabled><option>Location</option></select></div>
+                </div>
             </div>
         </div>
         <div class="col-md-9">
@@ -143,7 +276,7 @@
                                                 <div class="col-12 col-md-@(12 / (sections[secIndex].Rows[rowIndex].Fields.Count == 0 ? 1 : sections[secIndex].Rows[rowIndex].Fields.Count))" data-id="@i" @key="sections[secIndex].Rows[rowIndex].Fields[i]">
                                                     <FieldEditor Field="sections[secIndex].Rows[rowIndex].Fields[i]"
                                                                  OnRemove="async f => await RemoveField(secIndex, rowIndex, f)"
-                                                                 OnDuplicate="async f => await DuplicateField(secIndex, rowIndex, f)" />
+                                                                 OnSaveComponent="async f => await SaveComponent(f)" />
                                                 </div>
                                             }
                                         </div>
@@ -170,16 +303,12 @@
 }
 else
 {
-    <div class="row">
-        <div class="col-md-3" style="position:sticky;top:75px;max-height:calc(100vh - 90px);overflow-y:auto;">
-            <div class="mb-3">
-                <h5 class="mb-0">Toolbox</h5>
-            </div>
+    <div class="preview-overlay">
+        <div class="position-fixed top-0 end-0 m-3">
+            <button class="btn btn-secondary btn-sm" @onclick="TogglePreview">Building</button>
         </div>
-        <div class="col-md-9">
-            <div class="card p-3 shadow-sm">
-                <LivePreview Sections="sections" FormName="@formName" />
-            </div>
+        <div class="p-4">
+            <LivePreview Sections="sections" FormName="@formName" />
         </div>
     </div>
 }
@@ -197,6 +326,7 @@ else
     private bool ignoreNavigationPrompt = false;
     private List<string> deptOptions = new();
     private List<string> locOptions = new();
+    private List<CustomComponent> customComponents = new();
     private bool restrictionAlertShown = false;
 
     private Stack<List<DesignerSection>> undoStack = new();
@@ -245,7 +375,9 @@ else
             notificationEmail = currentUser?.Email ?? string.Empty;
             deptOptions = await UserService.GetDepartments();
             locOptions = await UserService.GetLocations();
+            customComponents = await ComponentService.GetForDepartment(currentUser?.Department ?? string.Empty);
             objRef ??= DotNetObjectReference.Create(this);
+            StateHasChanged();
         }
 
         if (!isPreviewMode)
@@ -256,7 +388,9 @@ else
             {
                 await JS.InvokeVoidAsync("initSortable", $"#section-{i}-rows", objRef);
             }
+            await JS.InvokeAsync<IJSObjectReference>("import", $"/js/dragdrop-wrapper.js?v={AppInfo.Version}");
             await JS.InvokeVoidAsync("initFieldDragDrop", "#sections-container", objRef);
+            await JS.InvokeVoidAsync("initToolboxPreview");
         }
     }
 
@@ -369,28 +503,58 @@ else
         await JS.InvokeVoidAsync("initSortable", $"#section-{sections.Count - 1}-rows", objRef!);
     }
 
-    DesignerField CreateField(string fieldType) => new DesignerField
+    DesignerField CreateField(string fieldType)
     {
-        FieldType = fieldType,
-        Key = fieldType switch
+        if (fieldType.StartsWith("component-") && int.TryParse(fieldType.Substring("component-".Length), out var id))
         {
-            "user" => "select a user",
-            "department" => "department",
-            "location" => "location",
-            _ => string.Empty
-        },
-        Label = fieldType switch
+            var comp = customComponents.FirstOrDefault(c => c.Id == id)?.Field;
+            if (comp != null)
+            {
+                return new DesignerField
+                {
+                    FieldType = comp.FieldType,
+                    Key = comp.Key,
+                    Label = comp.Label,
+                    Instructions = comp.Instructions,
+                    Placeholder = comp.Placeholder,
+                    CharLimit = comp.CharLimit,
+                    MinCharLimit = comp.MinCharLimit,
+                    IsRequired = comp.IsRequired,
+                    ImageUrl = comp.ImageUrl,
+                    ImageWidth = comp.ImageWidth,
+                    ImageHeight = comp.ImageHeight,
+                    OptionItems = new List<string>(comp.OptionItems),
+                    GridRows = new List<string>(comp.GridRows),
+                    GridColumns = new List<string>(comp.GridColumns),
+                    ScaleMin = comp.ScaleMin,
+                    ScaleMax = comp.ScaleMax
+                };
+            }
+        }
+
+        return new DesignerField
         {
-            "user" => "Select a user",
-            "department" => "Department",
-            "location" => "Location",
-            "statictext" => "Text",
-            _ => string.Empty
-        },
-        Placeholder = fieldType == "text" ? "Short answer" :
-                      fieldType == "textarea" ? "Paragraph" :
-                      fieldType == "dropdown" ? "Select one from dropdown" : string.Empty
-    };
+            FieldType = fieldType,
+            Key = fieldType switch
+            {
+                "user" => "select a user",
+                "department" => "department",
+                "location" => "location",
+                _ => string.Empty
+            },
+            Label = fieldType switch
+            {
+                "user" => "Select a user",
+                "department" => "Department",
+                "location" => "Location",
+                "statictext" => "Text",
+                _ => string.Empty
+            },
+            Placeholder = fieldType == "text" ? "Short answer" :
+                          fieldType == "textarea" ? "Paragraph" :
+                          fieldType == "dropdown" ? "Select one from dropdown" : string.Empty
+        };
+    }
 
     async Task RemoveField(int section, int row, DesignerField field)
     {
@@ -403,41 +567,27 @@ else
         await JS.InvokeVoidAsync("initSortable", $"#section-{section}-rows", objRef!);
     }
 
-    async Task DuplicateField(int section, int row, DesignerField field)
+    async Task SaveComponent(DesignerField field)
     {
-        PushUndo();
-        var copy = new DesignerField
+        if (currentUser == null) return;
+        var comp = await ComponentService.Save(field.Label, field, currentUser.Department ?? string.Empty, currentUser.UserName);
+        if (comp != null)
         {
-            Key = field.Key,
-            Label = field.Label,
-            FieldType = field.FieldType,
-            IsRequired = field.IsRequired,
-            CharLimit = field.CharLimit,
-            MinCharLimit = field.MinCharLimit,
-            OptionItems = new List<string>(field.OptionItems),
-            GridColumns = new List<string>(field.GridColumns),
-            GridRows = new List<string>(field.GridRows),
-            ScaleMin = field.ScaleMin,
-            ScaleMax = field.ScaleMax,
-            Placeholder = field.Placeholder,
-            ImageUrl = field.ImageUrl,
-            ImageWidth = field.ImageWidth,
-            ImageHeight = field.ImageHeight
-        };
-        var list = sections[section].Rows[row].Fields;
-        if (list.Count >= 4)
-        {
-            NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Warning,
-                Summary = "Column limit reached",
-                Detail = "A row can contain at most four columns."
-            });
-            return;
+            customComponents.Add(comp);
+            StateHasChanged();
         }
+    }
 
-        list.Insert(list.IndexOf(field) + 1, copy);
-        await JS.InvokeVoidAsync("initSortable", $"#section-{section}-rows", objRef!);
+    async Task DeleteComponent(int id)
+    {
+        if (currentUser == null) return;
+        await ComponentService.Delete(id, currentUser.UserName);
+        var match = customComponents.FirstOrDefault(c => c.Id == id);
+        if (match != null)
+        {
+            customComponents.Remove(match);
+            StateHasChanged();
+        }
     }
 
     [JSInvokable]
@@ -559,6 +709,7 @@ else
                     var rowsList = f.GridRows.Where(o => !string.IsNullOrWhiteSpace(o)).ToList();
                     var colsList = f.GridColumns.Where(o => !string.IsNullOrWhiteSpace(o)).ToList();
                     string? optionsJson = opts.Count > 0 ? JsonSerializer.Serialize(opts)
+                        : f.FieldType == "grid_text" && colsList.Count > 0 ? JsonSerializer.Serialize(new { Columns = colsList })
                         : rowsList.Count > 0 || colsList.Count > 0 ? JsonSerializer.Serialize(new { Rows = rowsList, Columns = colsList })
                         : f.FieldType == "scale" ? JsonSerializer.Serialize(new { Min = f.ScaleMin, Max = f.ScaleMax })
                         : !string.IsNullOrWhiteSpace(f.Instructions) ? JsonSerializer.Serialize(new { Instructions = f.Instructions })
@@ -635,6 +786,17 @@ else
                     Severity = NotificationSeverity.Warning,
                     Summary = "Options Required",
                     Detail = $"Add at least one row and column for '{f.Label}'."
+                });
+                return;
+            }
+
+            if (f.FieldType == "grid_text" && !f.GridColumns.Any(c => !string.IsNullOrWhiteSpace(c)))
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "Options Required",
+                    Detail = $"Add at least one column for '{f.Label}'."
                 });
                 return;
             }

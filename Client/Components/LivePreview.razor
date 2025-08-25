@@ -125,6 +125,26 @@
                                 </tbody>
                             </table>
                             break;
+                        case "grid_text":
+                            <table class="table table-bordered table-sm">
+                                <thead>
+                                    <tr>
+                                        @foreach (var col in field.GridColumns)
+                                        {
+                                            <th>@col</th>
+                                        }
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        @foreach (var col in field.GridColumns)
+                                        {
+                                            <td><input class="form-control" /></td>
+                                        }
+                                    </tr>
+                                </tbody>
+                            </table>
+                            break;
                         case "file":
                             <input type="file" class="form-control" />
                             break;
