@@ -19,11 +19,15 @@
                 <span class="badge bg-secondary">@GetTypeLabel(Field.FieldType)</span>
             </div>
             <div class="d-flex gap-2">
-                <button class="btn btn-sm btn-outline-secondary" @onclick="() => OnDuplicate.InvokeAsync(Field)">
-                    <span class="material-icons">content_copy</span>
-                </button>
-                <button class="btn btn-sm btn-outline-danger" @onclick="() => OnRemove.InvokeAsync(Field)">
-                    <span class="material-icons">delete</span>
+                @if (Field.FieldType is "radio" or "checkbox" or "dropdown" or 
+                    "grid_radio" or "grid_checkbox" or "grid_text")
+                {
+                    <button class="btn btn-sm btn-outline-primary" title="Save as component" @onclick="() => OnSaveComponent.InvokeAsync(Field)">
+                        <span class="material-icons">save</span>
+                    </button>
+                }
+                <button class="btn btn-outline-danger btn-sm p-1" @onclick="() => OnRemove.InvokeAsync(Field)">
+                    <span class="material-icons" style="font-size:16px;line-height:1">delete</span>
                 </button>
             </div>
         </div>
@@ -186,7 +190,7 @@
 @code {
     [Parameter] public DesignerField Field { get; set; }
     [Parameter] public EventCallback<DesignerField> OnRemove { get; set; }
-    [Parameter] public EventCallback<DesignerField> OnDuplicate { get; set; }
+    [Parameter] public EventCallback<DesignerField> OnSaveComponent { get; set; }
     [Parameter(CaptureUnmatchedValues = true)]
     public Dictionary<string, object> AdditionalAttributes { get; set; } = new();
 

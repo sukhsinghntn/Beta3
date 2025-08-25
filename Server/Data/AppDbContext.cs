@@ -10,6 +10,7 @@ namespace DynamicFormsApp.Server.Data
         public DbSet<Form> Forms { get; set; }
         public DbSet<FormField> FormFields { get; set; }
         public DbSet<DynamicFormsApp.Shared.Models.FormShare> FormShares { get; set; }
+        public DbSet<CustomComponent> CustomComponents { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

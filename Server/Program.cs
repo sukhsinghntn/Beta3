@@ -27,6 +27,7 @@ builder.Services.AddDbContext<AppDbContext>(opts =>
 
 // Dynamic form service
 builder.Services.AddScoped<DynamicFormService>();
+builder.Services.AddScoped<ComponentService>();
 
 // CORS policy to allow any origin, method, and header
 builder.Services.AddCors(options =>

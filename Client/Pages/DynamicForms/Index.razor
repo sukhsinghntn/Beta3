@@ -2,7 +2,9 @@
 @using System.Net.Http.Json
 @using System.Text.Json
 @using System.Collections.Generic
+@using System.Linq
 @using DynamicFormsApp.Client.Components
+@using DynamicFormsApp.Client.Services
 @using DynamicFormsApp.Shared
 @using DynamicFormsApp.Shared.Models
 @using Microsoft.JSInterop
@@ -11,6 +13,7 @@
 @inject NavigationManager Navigation
 @inject CookieHelper CookieHelper
 @inject IUserService UserService
+@inject ComponentServiceProxy ComponentService
 
 @implements IDisposable
 
@@ -113,6 +116,71 @@
                     <div class="toolbox-preview"><p class="m-0">Sample text</p></div>
                 </div>
             </div>
+            @if (customComponents.Any())
+            {
+                <h6 class="mt-3">Saved Components</h6>
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach (var comp in customComponents)
+                    {
+                        var field = comp.Field;
+                        <div class="draggable-field position-relative" draggable="true" data-type="component-@comp.Id">
+                            <span class="material-icons me-1">view_module</span> @comp.Name
+                            @if (comp.CreatedBy == currentUser?.UserName)
+                            {
+                                <button class="btn btn-link btn-sm text-danger position-absolute top-0 end-0" title="Delete" @onclick="() => DeleteComponent(comp.Id)">
+                                    <span class="material-icons" style="font-size:16px">delete</span>
+                                </button>
+                            }
+                            <div class="toolbox-preview">
+                                @if (field?.FieldType == "radio")
+                                {
+                                    foreach (var opt in field.OptionItems.Take(1))
+                                    {
+                                        <div class="form-check"><input class="form-check-input" type="radio" disabled /><label class="form-check-label">@opt</label></div>
+                                    }
+                                }
+                                else if (field?.FieldType == "checkbox")
+                                {
+                                    foreach (var opt in field.OptionItems.Take(1))
+                                    {
+                                        <div class="form-check"><input class="form-check-input" type="checkbox" disabled /><label class="form-check-label">@opt</label></div>
+                                    }
+                                }
+                                else if (field?.FieldType == "dropdown")
+                                {
+                                    <select class="form-select" disabled>
+                                        @foreach (var opt in field.OptionItems.Take(1))
+                                        {
+                                            <option>@opt</option>
+                                        }
+                                    </select>
+                                }
+                                else if (field?.FieldType == "grid_radio")
+                                {
+                                    <table class="table table-bordered table-sm mb-0">
+                                        <thead><tr><th></th>@foreach(var c in field.GridColumns.Take(1)){<th>@c</th>}</tr></thead>
+                                        <tbody>@foreach(var r in field.GridRows.Take(1)){<tr><th scope="row">@r</th><td><input type="radio" disabled /></td></tr>}</tbody>
+                                    </table>
+                                }
+                                else if (field?.FieldType == "grid_checkbox")
+                                {
+                                    <table class="table table-bordered table-sm mb-0">
+                                        <thead><tr><th></th>@foreach(var c in field.GridColumns.Take(1)){<th>@c</th>}</tr></thead>
+                                        <tbody>@foreach(var r in field.GridRows.Take(1)){<tr><th scope="row">@r</th><td><input type="checkbox" disabled /></td></tr>}</tbody>
+                                    </table>
+                                }
+                                else if (field?.FieldType == "grid_text")
+                                {
+                                    <table class="table table-bordered table-sm mb-0">
+                                        <thead><tr>@foreach(var c in field.GridColumns.Take(1)){<th>@c</th>}</tr></thead>
+                                        <tbody><tr><td><input class="form-control" disabled /></td></tr></tbody>
+                                    </table>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
             <h6 class="mt-3">User Fields</h6>
             <div class="d-flex flex-wrap gap-2">
                 <div class="draggable-field" draggable="true" data-type="user">
@@ -208,7 +276,7 @@
                                                 <div class="col-12 col-md-@(12 / (sections[secIndex].Rows[rowIndex].Fields.Count == 0 ? 1 : sections[secIndex].Rows[rowIndex].Fields.Count))" data-id="@i" @key="sections[secIndex].Rows[rowIndex].Fields[i]">
                                                     <FieldEditor Field="sections[secIndex].Rows[rowIndex].Fields[i]"
                                                                  OnRemove="async f => await RemoveField(secIndex, rowIndex, f)"
-                                                                 OnDuplicate="async f => await DuplicateField(secIndex, rowIndex, f)" />
+                                                                 OnSaveComponent="async f => await SaveComponent(f)" />
                                                 </div>
                                             }
                                         </div>
@@ -258,6 +326,7 @@ else
     private bool ignoreNavigationPrompt = false;
     private List<string> deptOptions = new();
     private List<string> locOptions = new();
+    private List<CustomComponent> customComponents = new();
     private bool restrictionAlertShown = false;
 
     private Stack<List<DesignerSection>> undoStack = new();
@@ -306,7 +375,9 @@ else
             notificationEmail = currentUser?.Email ?? string.Empty;
             deptOptions = await UserService.GetDepartments();
             locOptions = await UserService.GetLocations();
+            customComponents = await ComponentService.GetForDepartment(currentUser?.Department ?? string.Empty);
             objRef ??= DotNetObjectReference.Create(this);
+            StateHasChanged();
         }
 
         if (!isPreviewMode)
@@ -432,28 +503,58 @@ else
         await JS.InvokeVoidAsync("initSortable", $"#section-{sections.Count - 1}-rows", objRef!);
     }
 
-    DesignerField CreateField(string fieldType) => new DesignerField
+    DesignerField CreateField(string fieldType)
     {
-        FieldType = fieldType,
-        Key = fieldType switch
+        if (fieldType.StartsWith("component-") && int.TryParse(fieldType.Substring("component-".Length), out var id))
         {
-            "user" => "select a user",
-            "department" => "department",
-            "location" => "location",
-            _ => string.Empty
-        },
-        Label = fieldType switch
+            var comp = customComponents.FirstOrDefault(c => c.Id == id)?.Field;
+            if (comp != null)
+            {
+                return new DesignerField
+                {
+                    FieldType = comp.FieldType,
+                    Key = comp.Key,
+                    Label = comp.Label,
+                    Instructions = comp.Instructions,
+                    Placeholder = comp.Placeholder,
+                    CharLimit = comp.CharLimit,
+                    MinCharLimit = comp.MinCharLimit,
+                    IsRequired = comp.IsRequired,
+                    ImageUrl = comp.ImageUrl,
+                    ImageWidth = comp.ImageWidth,
+                    ImageHeight = comp.ImageHeight,
+                    OptionItems = new List<string>(comp.OptionItems),
+                    GridRows = new List<string>(comp.GridRows),
+                    GridColumns = new List<string>(comp.GridColumns),
+                    ScaleMin = comp.ScaleMin,
+                    ScaleMax = comp.ScaleMax
+                };
+            }
+        }
+
+        return new DesignerField
         {
-            "user" => "Select a user",
-            "department" => "Department",
-            "location" => "Location",
-            "statictext" => "Text",
-            _ => string.Empty
-        },
-        Placeholder = fieldType == "text" ? "Short answer" :
-                      fieldType == "textarea" ? "Paragraph" :
-                      fieldType == "dropdown" ? "Select one from dropdown" : string.Empty
-    };
+            FieldType = fieldType,
+            Key = fieldType switch
+            {
+                "user" => "select a user",
+                "department" => "department",
+                "location" => "location",
+                _ => string.Empty
+            },
+            Label = fieldType switch
+            {
+                "user" => "Select a user",
+                "department" => "Department",
+                "location" => "Location",
+                "statictext" => "Text",
+                _ => string.Empty
+            },
+            Placeholder = fieldType == "text" ? "Short answer" :
+                          fieldType == "textarea" ? "Paragraph" :
+                          fieldType == "dropdown" ? "Select one from dropdown" : string.Empty
+        };
+    }
 
     async Task RemoveField(int section, int row, DesignerField field)
     {
@@ -466,41 +567,27 @@ else
         await JS.InvokeVoidAsync("initSortable", $"#section-{section}-rows", objRef!);
     }
 
-    async Task DuplicateField(int section, int row, DesignerField field)
+    async Task SaveComponent(DesignerField field)
     {
-        PushUndo();
-        var copy = new DesignerField
+        if (currentUser == null) return;
+        var comp = await ComponentService.Save(field.Label, field, currentUser.Department ?? string.Empty, currentUser.UserName);
+        if (comp != null)
         {
-            Key = field.Key,
-            Label = field.Label,
-            FieldType = field.FieldType,
-            IsRequired = field.IsRequired,
-            CharLimit = field.CharLimit,
-            MinCharLimit = field.MinCharLimit,
-            OptionItems = new List<string>(field.OptionItems),
-            GridColumns = new List<string>(field.GridColumns),
-            GridRows = new List<string>(field.GridRows),
-            ScaleMin = field.ScaleMin,
-            ScaleMax = field.ScaleMax,
-            Placeholder = field.Placeholder,
-            ImageUrl = field.ImageUrl,
-            ImageWidth = field.ImageWidth,
-            ImageHeight = field.ImageHeight
-        };
-        var list = sections[section].Rows[row].Fields;
-        if (list.Count >= 4)
-        {
-            NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Warning,
-                Summary = "Column limit reached",
-                Detail = "A row can contain at most four columns."
-            });
-            return;
+            customComponents.Add(comp);
+            StateHasChanged();
         }
+    }
 
-        list.Insert(list.IndexOf(field) + 1, copy);
-        await JS.InvokeVoidAsync("initSortable", $"#section-{section}-rows", objRef!);
+    async Task DeleteComponent(int id)
+    {
+        if (currentUser == null) return;
+        await ComponentService.Delete(id, currentUser.UserName);
+        var match = customComponents.FirstOrDefault(c => c.Id == id);
+        if (match != null)
+        {
+            customComponents.Remove(match);
+            StateHasChanged();
+        }
     }
 
     [JSInvokable]

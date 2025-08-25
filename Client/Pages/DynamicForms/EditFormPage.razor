@@ -3,7 +3,9 @@
 @using System.Net
 @using System.Text.Json
 @using System.Collections.Generic
+@using System.Linq
 @using DynamicFormsApp.Client.Components
+@using DynamicFormsApp.Client.Services
 @using DynamicFormsApp.Shared
 @using DynamicFormsApp.Shared.Models
 @inject IJSRuntime JS
@@ -11,6 +13,7 @@
 @inject NavigationManager Navigation
 @inject CookieHelper CookieHelper
 @inject IUserService UserService
+@inject ComponentServiceProxy ComponentService
 
 @implements IDisposable
 
@@ -65,6 +68,24 @@ else if (!string.IsNullOrEmpty(deletedMessage))
                 <div class="draggable-field" draggable="true" data-type="image"><span class="material-icons me-1">image</span> Image</div>
                 <div class="draggable-field" draggable="true" data-type="statictext"><span class="material-icons me-1">text_fields</span> Text</div>
             </div>
+            @if (customComponents.Any())
+            {
+                <h6 class="mt-3">Saved Components</h6>
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach (var comp in customComponents)
+                    {
+                        <div class="draggable-field position-relative" draggable="true" data-type="component-@comp.Id">
+                            <span class="material-icons me-1">view_module</span> @comp.Name
+                            @if (comp.CreatedBy == currentUser?.UserName)
+                            {
+                                <button class="btn btn-link btn-sm text-danger position-absolute top-0 end-0" title="Delete" @onclick="() => DeleteComponent(comp.Id)">
+                                    <span class="material-icons" style="font-size:16px">delete</span>
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+            }
             <h6 class="mt-3">User Fields</h6>
             <div class="d-flex flex-wrap gap-2">
                 <div class="draggable-field" draggable="true" data-type="user"><span class="material-icons me-1">person</span> User Dropdown</div>
@@ -151,7 +172,7 @@ else if (!string.IsNullOrEmpty(deletedMessage))
                                                 <div class="col-12 col-md-@(12 / (sections[secIndex].Rows[rowIndex].Fields.Count == 0 ? 1 : sections[secIndex].Rows[rowIndex].Fields.Count))" data-id="@i" @key="sections[secIndex].Rows[rowIndex].Fields[i]">
                                                     <FieldEditor Field="sections[secIndex].Rows[rowIndex].Fields[i]"
                                                                  OnRemove="async f => await RemoveField(secIndex, rowIndex, f)"
-                                                                 OnDuplicate="async f => await DuplicateField(secIndex, rowIndex, f)" />
+                                                                 OnSaveComponent="async f => await SaveComponent(f)" />
                                                 </div>
                                             }
                                         </div>
@@ -217,6 +238,7 @@ else
     private DeletedFormInfo? unavailableInfo;
     private List<string> deptOptions = new();
     private List<string> locOptions = new();
+    private List<CustomComponent> customComponents = new();
     private bool restrictionAlertShown = false;
 
     private Stack<List<DesignerSection>> undoStack = new();
@@ -265,6 +287,7 @@ else
             notificationEmail = currentUser?.Email ?? string.Empty;
             deptOptions = await UserService.GetDepartments();
             locOptions = await UserService.GetLocations();
+            customComponents = await ComponentService.GetForDepartment(currentUser?.Department ?? string.Empty);
 
             var resp = await Http.GetAsync($"api/forms/{FormId}");
             if (!resp.IsSuccessStatusCode)
@@ -302,7 +325,9 @@ else
             {
                 await JS.InvokeVoidAsync("initSortable", $"#section-{i}-rows", objRef);
             }
+            await JS.InvokeAsync<IJSObjectReference>("import", $"/js/dragdrop-wrapper.js?v={AppInfo.Version}");
             await JS.InvokeVoidAsync("initFieldDragDrop", "#sections-container", objRef);
+            await JS.InvokeVoidAsync("initToolboxPreview");
         }
     }
 
@@ -406,28 +431,58 @@ public void OnSortUpdate(int fromSection, int fromRow, int oldIndex, int toSecti
     }
 }
 
-    DesignerField CreateField(string fieldType) => new DesignerField
+    DesignerField CreateField(string fieldType)
     {
-        FieldType = fieldType,
-        Key = fieldType switch
+        if (fieldType.StartsWith("component-") && int.TryParse(fieldType.Substring("component-".Length), out var id))
         {
-            "user" => "select a user",
-            "department" => "department",
-            "location" => "location",
-            _ => string.Empty
-        },
-        Label = fieldType switch
+            var comp = customComponents.FirstOrDefault(c => c.Id == id)?.Field;
+            if (comp != null)
+            {
+                return new DesignerField
+                {
+                    FieldType = comp.FieldType,
+                    Key = comp.Key,
+                    Label = comp.Label,
+                    Instructions = comp.Instructions,
+                    Placeholder = comp.Placeholder,
+                    CharLimit = comp.CharLimit,
+                    MinCharLimit = comp.MinCharLimit,
+                    IsRequired = comp.IsRequired,
+                    ImageUrl = comp.ImageUrl,
+                    ImageWidth = comp.ImageWidth,
+                    ImageHeight = comp.ImageHeight,
+                    OptionItems = new List<string>(comp.OptionItems),
+                    GridRows = new List<string>(comp.GridRows),
+                    GridColumns = new List<string>(comp.GridColumns),
+                    ScaleMin = comp.ScaleMin,
+                    ScaleMax = comp.ScaleMax
+                };
+            }
+        }
+
+        return new DesignerField
         {
-            "user" => "Select a user",
-            "department" => "Department",
-            "location" => "Location",
-            "statictext" => "Text",
-            _ => string.Empty
-        },
-        Placeholder = fieldType == "text" ? "Short answer" :
-                      fieldType == "textarea" ? "Paragraph" :
-                      fieldType == "dropdown" ? "Select one from dropdown" : string.Empty
-    };
+            FieldType = fieldType,
+            Key = fieldType switch
+            {
+                "user" => "select a user",
+                "department" => "department",
+                "location" => "location",
+                _ => string.Empty
+            },
+            Label = fieldType switch
+            {
+                "user" => "Select a user",
+                "department" => "Department",
+                "location" => "Location",
+                "statictext" => "Text",
+                _ => string.Empty
+            },
+            Placeholder = fieldType == "text" ? "Short answer" :
+                          fieldType == "textarea" ? "Paragraph" :
+                          fieldType == "dropdown" ? "Select one from dropdown" : string.Empty
+        };
+    }
 
     async Task RemoveField(int section, int row, DesignerField field)
     {
@@ -451,41 +506,27 @@ public void OnSortUpdate(int fromSection, int fromRow, int oldIndex, int toSecti
         await JS.InvokeVoidAsync("initSortable", $"#section-{section}-rows", objRef!);
     }
 
-    async Task DuplicateField(int section, int row, DesignerField field)
+    async Task SaveComponent(DesignerField field)
     {
-        PushUndo();
-        var copy = new DesignerField
+        if (currentUser == null) return;
+        var comp = await ComponentService.Save(field.Label, field, currentUser.Department ?? string.Empty, currentUser.UserName);
+        if (comp != null)
         {
-            Key = field.Key,
-            Label = field.Label,
-            FieldType = field.FieldType,
-            Placeholder = field.Placeholder,
-            CharLimit = field.CharLimit,
-            MinCharLimit = field.MinCharLimit,
-            IsRequired = field.IsRequired,
-            OptionItems = new List<string>(field.OptionItems),
-            GridColumns = new List<string>(field.GridColumns),
-            GridRows = new List<string>(field.GridRows),
-            ScaleMin = field.ScaleMin,
-            ScaleMax = field.ScaleMax,
-            ImageUrl = field.ImageUrl,
-            ImageWidth = field.ImageWidth,
-            ImageHeight = field.ImageHeight
-        };
-        var list = sections[section].Rows[row].Fields;
-        if (list.Count >= 4)
-        {
-            NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Warning,
-                Summary = "Column limit reached",
-                Detail = "A row can contain at most four columns."
-            });
-            return;
+            customComponents.Add(comp);
+            StateHasChanged();
         }
+    }
 
-        list.Insert(list.IndexOf(field) + 1, copy);
-        await JS.InvokeVoidAsync("initSortable", $"#section-{section}-rows", objRef!);
+    async Task DeleteComponent(int id)
+    {
+        if (currentUser == null) return;
+        await ComponentService.Delete(id, currentUser.UserName);
+        var match = customComponents.FirstOrDefault(c => c.Id == id);
+        if (match != null)
+        {
+            customComponents.Remove(match);
+            StateHasChanged();
+        }
     }
 
 [JSInvokable]
