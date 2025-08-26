@@ -5,6 +5,7 @@
 @using System.Linq
 @using DynamicFormsApp.Shared.Models
 @using System.Net
+@using System.Collections.Generic
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject CookieHelper CookieHelper
@@ -110,7 +111,7 @@ else
                             <option value="" disabled selected>Select user...</option>
                             @foreach (var u in directoryUsers)
                             {
-                                <option value="@u.DisplayName">@u.DisplayName - @u.Department - @u.Location</option>
+                                <option value="@u.DisplayName">@FormatUserOption(u)</option>
                             }
                         </select>
                         break;
@@ -307,6 +308,14 @@ else
 
     string GetImageStyle(FormField f) =>
         $"max-width:100%;{(f.ImageWidth.HasValue ? $"width:{f.ImageWidth}px;" : string.Empty)}{(f.ImageHeight.HasValue ? $"height:{f.ImageHeight}px;" : string.Empty)}";
+
+    string FormatUserOption(UserModel u)
+    {
+        var parts = new List<string> { u.DisplayName };
+        if (!string.IsNullOrWhiteSpace(u.Department)) parts.Add(u.Department);
+        if (!string.IsNullOrWhiteSpace(u.Location)) parts.Add(u.Location);
+        return string.Join(" - ", parts);
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
