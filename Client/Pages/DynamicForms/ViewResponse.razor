@@ -3,6 +3,8 @@
 @using System.Net
 @using System.Text.Json
 @using System.Linq
+@using System.Text
+@using System.Collections.Generic
 @using DynamicFormsApp.Shared.Models
 @inject HttpClient Http
 @inject NavigationManager Navigation
@@ -72,17 +74,34 @@ else
         <div class="row g-3 mb-3">
         @foreach (var fld in rowGroup)
         {
-            <div class="col-12 col-md-@(12 / (rowGroup.Count() == 0 ? 1 : rowGroup.Count()))">
-                <div class="mb-3">
-                    @if (fld.FieldType != "image" && fld.FieldType != "statictext")
+            if (fld.FieldType == "section")
+            {
+                <div class="col-12">
+                    <hr />
+                    @if (!string.IsNullOrWhiteSpace(fld.Label))
                     {
-                        <label class="form-label fw-semibold">@fld.Label</label>
+                        <h5>@fld.Label</h5>
                     }
-                    <div class="form-control-plaintext border rounded bg-light p-2" style="color:black">
-                        @DisplayValue(fld)
+                    @if (!string.IsNullOrWhiteSpace(GetInstructions(fld)))
+                    {
+                        <p class="text-muted">@GetInstructions(fld)</p>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="col-12 col-md-@(12 / (rowGroup.Count() == 0 ? 1 : rowGroup.Count()))">
+                    <div class="mb-3">
+                        @if (fld.FieldType != "image" && fld.FieldType != "statictext")
+                        {
+                            <label class="form-label fw-semibold">@fld.Label</label>
+                        }
+                        <div class="form-control-plaintext border rounded bg-light p-2" style="color:black">
+                            @DisplayValue(fld)
+                        </div>
                     </div>
                 </div>
-            </div>
+            }
         }
         </div>
     }
@@ -246,11 +265,61 @@ else
                 }
             }
         }
+        else if (field.FieldType == "grid_text")
+        {
+            if (!string.IsNullOrWhiteSpace(val))
+            {
+                try
+                {
+                    var rows = JsonSerializer.Deserialize<List<Dictionary<string, string>>>(val) ?? new();
+                    var opts = JsonSerializer.Deserialize<GridOptions>(field.OptionsJson ?? "{}");
+                    var cols = opts?.Columns ?? new List<string>();
+                    var sb = new StringBuilder("<table class='table table-bordered table-sm mb-0'><thead><tr>");
+                    foreach (var c in cols)
+                    {
+                        sb.Append($"<th>{WebUtility.HtmlEncode(c)}</th>");
+                    }
+                    sb.Append("</tr></thead><tbody>");
+                    foreach (var row in rows)
+                    {
+                        sb.Append("<tr>");
+                        foreach (var c in cols)
+                        {
+                            row.TryGetValue(c, out var cell);
+                            sb.Append($"<td>{WebUtility.HtmlEncode(cell)}</td>");
+                        }
+                        sb.Append("</tr>");
+                    }
+                    sb.Append("</tbody></table>");
+                    builder.AddMarkupContent(12, sb.ToString());
+                }
+                catch
+                {
+                    builder.AddContent(13, val);
+                }
+            }
+        }
         else
         {
             builder.AddContent(9, val);
         }
     };
+
+    string? GetInstructions(FormField field)
+    {
+        if (string.IsNullOrWhiteSpace(field.OptionsJson))
+            return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(field.OptionsJson);
+            if (doc.RootElement.TryGetProperty("Instructions", out var instEl))
+                return instEl.GetString();
+        }
+        catch
+        {
+        }
+        return null;
+    }
 
     bool IsImage(string path)
     {
@@ -280,12 +349,33 @@ else
             }
             return val;
         }
+        if (field.FieldType == "grid_text")
+        {
+            if (!string.IsNullOrWhiteSpace(val))
+            {
+                try
+                {
+                    var rows = JsonSerializer.Deserialize<List<Dictionary<string, string>>>(val) ?? new();
+                    return string.Join(" | ", rows.Select(r => string.Join(", ", r.Select(kv => $"{kv.Key}:{kv.Value}"))));
+                }
+                catch
+                {
+                }
+            }
+            return val;
+        }
         if (field.FieldType == "image" || field.FieldType == "statictext")
         {
             return string.Empty;
         }
 
         return val;
+    }
+
+    private class GridOptions
+    {
+        public List<string>? Rows { get; set; }
+        public List<string>? Columns { get; set; }
     }
 
     private async Task DownloadCsv()

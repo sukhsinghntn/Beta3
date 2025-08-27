@@ -8,6 +8,7 @@
     user-select: none;
     display: inline-flex;
     align-items: center;
+    position: relative;
     flex: 0 0 calc(50% - 0.5rem);
 }
 
@@ -18,6 +19,19 @@
 
     .draggable-field:hover {
         background-color: #e9ecef;
+    }
+
+    .toolbox-preview {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        background: #fff;
+        border: 1px solid #ccc;
+        padding: 4px;
+        z-index: 1000;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        pointer-events: none;
     }
 
 /* 📋 Form canvas drop zone */
