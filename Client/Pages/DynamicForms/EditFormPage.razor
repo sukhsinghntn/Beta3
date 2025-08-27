@@ -17,26 +17,19 @@
 
 @implements IDisposable
 
-<h2 class="mb-2">Form Builder</h2>
-@if (unavailableInfo != null)
-{
-    <FormUnavailableDisplay Info="@unavailableInfo" />
-}
-else if (!string.IsNullOrEmpty(deletedMessage))
-{
-    <div class="alert alert-warning">@deletedMessage</div>
-}
-<p class="text-muted">Drag fields to reorder or move them between rows. Each row can have up to four columns.</p>
-
-@if (isPreviewMode)
-{
-    <div class="mb-3">
-        <button class="btn btn-outline-primary btn-sm" @onclick="TogglePreview">Edit Mode</button>
-    </div>
-}
-
 @if (!isPreviewMode)
 {
+    <h2 class="mb-2">Form Builder</h2>
+    @if (unavailableInfo != null)
+    {
+        <FormUnavailableDisplay Info="@unavailableInfo" />
+    }
+    else if (!string.IsNullOrEmpty(deletedMessage))
+    {
+        <div class="alert alert-warning">@deletedMessage</div>
+    }
+    <p class="text-muted">Drag fields to reorder or move them between rows. Each row can have up to four columns.</p>
+
     <div class="row">
         <div class="col-md-3" style="position:sticky;top:75px;max-height:calc(100vh - 90px);overflow-y:auto;">
             <div class="mb-3 d-flex align-items-center gap-2">
@@ -208,16 +201,12 @@ else if (!string.IsNullOrEmpty(deletedMessage))
 }
 else
 {
-    <div class="row">
-        <div class="col-md-3" style="position:sticky;top:75px;max-height:calc(100vh - 90px);overflow-y:auto;">
-            <div class="mb-3">
-                <h5 class="mb-0">Toolbox</h5>
-            </div>
+    <div class="preview-overlay">
+        <div class="position-fixed top-0 end-0 m-3">
+            <button class="btn btn-outline-primary btn-sm" @onclick="TogglePreview">Edit Mode</button>
         </div>
-        <div class="col-md-9">
-            <div class="card p-3 shadow-sm">
-                <LivePreview Sections="sections" FormName="@formName" />
-            </div>
+        <div class="p-4">
+            <LivePreview Sections="sections" FormName="@formName" />
         </div>
     </div>
 }
