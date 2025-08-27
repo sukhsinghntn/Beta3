@@ -721,6 +721,7 @@ namespace DynamicFormsApp.Server.Services
             "textarea" => "NVARCHAR(MAX)",
             "grid_radio" => "NVARCHAR(MAX)",    // JSON object
             "grid_checkbox" => "NVARCHAR(MAX)", // JSON object
+            "grid_text" => "NVARCHAR(MAX)",     // JSON array of rows
             "scale" => "INT",
             _ => "NVARCHAR(MAX)"
         };
