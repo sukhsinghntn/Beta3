@@ -47,17 +47,17 @@ namespace DynamicFormsApp.Server.Controllers
             await _service.DeleteAsync(id, user);
             return NoContent();
         }
+        
+        private static bool RequiresOptions(string fieldType) =>
+            fieldType is "radio" or "checkbox" or "dropdown" or
+            "grid_radio" or "grid_checkbox" or "grid_text";
+
+        private static bool HasOptions(DesignerField field) => field.FieldType switch
+        {
+            "radio" or "checkbox" or "dropdown" => field.OptionItems.Any(o => !string.IsNullOrWhiteSpace(o)),
+            "grid_radio" or "grid_checkbox" => field.GridRows.Any(r => !string.IsNullOrWhiteSpace(r)) && field.GridColumns.Any(c => !string.IsNullOrWhiteSpace(c)),
+            "grid_text" => field.GridColumns.Any(c => !string.IsNullOrWhiteSpace(c)),
+            _ => true
+        };
     }
-
-    private static bool RequiresOptions(string fieldType) =>
-        fieldType is "radio" or "checkbox" or "dropdown" or
-        "grid_radio" or "grid_checkbox" or "grid_text";
-
-    private static bool HasOptions(DesignerField field) => field.FieldType switch
-    {
-        "radio" or "checkbox" or "dropdown" => field.OptionItems.Any(o => !string.IsNullOrWhiteSpace(o)),
-        "grid_radio" or "grid_checkbox" => field.GridRows.Any(r => !string.IsNullOrWhiteSpace(r)) && field.GridColumns.Any(c => !string.IsNullOrWhiteSpace(c)),
-        "grid_text" => field.GridColumns.Any(c => !string.IsNullOrWhiteSpace(c)),
-        _ => true
-    };
 }
