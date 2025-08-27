@@ -34,10 +34,7 @@
                     <button class="btn btn-secondary btn-sm" @onclick="Redo" disabled="@(!redoStack.Any())">
                         <span class="material-icons">redo</span>
                     </button>
-                    <button class="btn btn-primary btn-sm d-flex align-items-center gap-1" @onclick="TogglePreview">
-                        <span class="material-icons">visibility</span>
-                        Edit Mode ↔ Live Mode
-                    </button>
+                    <button class="btn btn-outline-primary btn-sm" @onclick="TogglePreview">Live Mode</button>
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2">
@@ -308,10 +305,7 @@ else
 {
     <div class="preview-overlay">
         <div class="position-fixed top-0 end-0 m-3">
-            <button class="btn btn-primary btn-sm d-flex align-items-center gap-1" @onclick="TogglePreview">
-                <span class="material-icons">edit</span>
-                Edit Mode ↔ Live Mode
-            </button>
+            <button class="btn btn-outline-primary btn-sm" @onclick="TogglePreview">Edit Mode</button>
         </div>
         <div class="p-4">
             <LivePreview Sections="sections" FormName="@formName" />
