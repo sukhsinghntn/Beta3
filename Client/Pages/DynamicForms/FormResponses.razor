@@ -37,6 +37,23 @@
             <button class="btn btn-outline-info me-2" @onclick="DownloadCsv">Download CSV</button>
             <button class="btn btn-outline-info" @onclick="DownloadPdf">Download PDF</button>
         </div>
+        <div class="row g-2 mb-3">
+            <div class="col-auto">
+                <input class="form-control form-control-sm" placeholder="Response ID" @bind="responseIdFilter" />
+            </div>
+            <div class="col-auto">
+                <input class="form-control form-control-sm" placeholder="Submitted By" @bind="submitFilter" />
+            </div>
+            <div class="col-auto">
+                <select class="form-select form-select-sm" @bind="statusFilter">
+                    <option value="">All Statuses</option>
+                    @foreach (var opt in statusOptions)
+                    {
+                        <option value="@opt">@opt</option>
+                    }
+                </select>
+            </div>
+        </div>
         <div class="table-responsive">
             <table id="responsesTable" class="table table-bordered table-hover align-middle">
                 <thead class="table-light">
@@ -46,22 +63,6 @@
                             <th scope="col">@(col switch { "ResponderName" => "Submitted By", "CreatedAt" => "Submitted At", _ => col })</th>
                         }
                         <th scope="col"></th>
-                    </tr>
-                    <tr>
-                        @foreach (var col in columns)
-                        {
-                            <th>
-                                @if (col == "ResponseId")
-                                {
-                                    <input class="form-control form-control-sm" placeholder="Filter" @bind="responseIdFilter" />
-                                }
-                                else if (col == "ResponderName")
-                                {
-                                    <input class="form-control form-control-sm" placeholder="Filter" @bind="submitFilter" />
-                                }
-                            </th>
-                        }
-                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -103,10 +104,13 @@
     private DeletedFormInfo? unavailableInfo;
     private string responseIdFilter = string.Empty;
     private string submitFilter = string.Empty;
+    private string statusFilter = string.Empty;
+    private List<string> statusOptions = new();
     private IEnumerable<Dictionary<string, object>> FilteredResponses =>
         responses.Where(row =>
             (string.IsNullOrWhiteSpace(responseIdFilter) || row["ResponseId"].ToString().Contains(responseIdFilter, StringComparison.OrdinalIgnoreCase)) &&
-            (string.IsNullOrWhiteSpace(submitFilter) || (row.TryGetValue("ResponderName", out var rn) && rn?.ToString()?.Contains(submitFilter, StringComparison.OrdinalIgnoreCase) == true)));
+            (string.IsNullOrWhiteSpace(submitFilter) || (row.TryGetValue("ResponderName", out var rn) && rn?.ToString()?.Contains(submitFilter, StringComparison.OrdinalIgnoreCase) == true)) &&
+            (string.IsNullOrWhiteSpace(statusFilter) || (row.TryGetValue("Status", out var st) && string.Equals(st?.ToString(), statusFilter, StringComparison.OrdinalIgnoreCase))));
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -145,11 +149,18 @@
             }
             responses = await respData.Content.ReadFromJsonAsync<List<Dictionary<string, object>>>();
 
-            columns = new[] { "ResponseId", "CreatedAt" };
+            columns = new[] { "ResponseId", "CreatedAt", "Status" };
             if (form.RequireLogin)
             {
                 columns = columns.Concat(new[] { "ResponderName" }).ToArray();
             }
+
+            statusOptions = responses
+                .Select(r => r.TryGetValue("Status", out var st) ? st?.ToString() ?? string.Empty : string.Empty)
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(s => s)
+                .ToList();
 
             exportModule = await JS.InvokeAsync<IJSObjectReference>("import", "/js/exportHelper.js");
             StateHasChanged();
