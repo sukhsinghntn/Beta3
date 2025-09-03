@@ -153,6 +153,7 @@ else
         ["Pending"] = "⏳",
         ["Rejected"] = "❌"
     };
+    private List<string> iconChoices = new() { "🏷️", "✅", "⏳", "❌", "⭐", "⚠️", "📌" };
 
     int? PrevId =>
         responseIds != null && responseIds.IndexOf(ResponseId) > 0
@@ -230,6 +231,17 @@ else
             }
         }
 
+        var savedIcons = await JS.InvokeAsync<string>("localStorage.getItem", $"form_{FormId}_statusIcons");
+        if (!string.IsNullOrWhiteSpace(savedIcons))
+        {
+            var stored = JsonSerializer.Deserialize<Dictionary<string, string>>(savedIcons) ?? new();
+            foreach (var kv in stored)
+            {
+                statusIcons[kv.Key] = kv.Value;
+                if (!statusOptions.Contains(kv.Key)) statusOptions.Add(kv.Key);
+            }
+        }
+
         if (exportModule == null)
         {
             exportModule = await JS.InvokeAsync<IJSObjectReference>("import", "/js/exportHelper.js");
@@ -241,11 +253,14 @@ else
         var value = e.Value?.ToString();
         if (value == "__custom")
         {
-            var custom = await JS.InvokeAsync<string>("prompt", "Enter custom status label:");
-            if (!string.IsNullOrWhiteSpace(custom))
+            var result = await DialogService.OpenAsync<StatusLabelDialog>("Add Label",
+                new Dictionary<string, object> { { "Icons", iconChoices } });
+            if (result is StatusLabel custom && !string.IsNullOrWhiteSpace(custom.Label))
             {
-                if (!statusOptions.Contains(custom)) statusOptions.Add(custom);
-                status = custom;
+                if (!statusOptions.Contains(custom.Label)) statusOptions.Add(custom.Label);
+                statusIcons[custom.Label] = custom.Icon;
+                await JS.InvokeVoidAsync("localStorage.setItem", $"form_{FormId}_statusIcons", JsonSerializer.Serialize(statusIcons));
+                status = custom.Label;
                 await Http.PutAsJsonAsync($"api/forms/{FormId}/responses/{ResponseId}/status", new { Status = status });
             }
         }

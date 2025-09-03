@@ -167,6 +167,7 @@
         ["Pending"] = "⏳",
         ["Rejected"] = "❌"
     };
+    private List<string> iconChoices = new() { "🏷️", "✅", "⏳", "❌", "⭐", "⚠️", "📌" };
     private string responseIdFilter = string.Empty;
     private string submitFilter = string.Empty;
     private string statusFilter = string.Empty;
@@ -221,6 +222,17 @@
             foreach (var s in existingStatuses)
             {
                 if (!statusOptions.Contains(s)) statusOptions.Add(s);
+            }
+
+            var savedIcons = await JS.InvokeAsync<string>("localStorage.getItem", $"form_{FormId}_statusIcons");
+            if (!string.IsNullOrWhiteSpace(savedIcons))
+            {
+                var stored = JsonSerializer.Deserialize<Dictionary<string, string>>(savedIcons) ?? new();
+                foreach (var kv in stored)
+                {
+                    statusIcons[kv.Key] = kv.Value;
+                    if (!statusOptions.Contains(kv.Key)) statusOptions.Add(kv.Key);
+                }
             }
 
             var fieldKeys = form.Fields
@@ -395,12 +407,15 @@
     {
         if (value == "__custom")
         {
-            var custom = await JS.InvokeAsync<string>("prompt", "Enter custom status label:");
-            if (!string.IsNullOrWhiteSpace(custom))
+            var result = await DialogService.OpenAsync<StatusLabelDialog>("Add Label",
+                new Dictionary<string, object> { { "Icons", iconChoices } });
+            if (result is StatusLabel custom && !string.IsNullOrWhiteSpace(custom.Label))
             {
-                if (!statusOptions.Contains(custom)) statusOptions.Add(custom);
-                await UpdateStatus(row["ResponseId"], custom);
-                row["Status"] = custom;
+                if (!statusOptions.Contains(custom.Label)) statusOptions.Add(custom.Label);
+                statusIcons[custom.Label] = custom.Icon;
+                await JS.InvokeVoidAsync("localStorage.setItem", $"form_{FormId}_statusIcons", JsonSerializer.Serialize(statusIcons));
+                await UpdateStatus(row["ResponseId"], custom.Label);
+                row["Status"] = custom.Label;
             }
         }
         else
