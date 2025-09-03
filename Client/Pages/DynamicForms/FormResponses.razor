@@ -102,22 +102,26 @@
                                             <span class="text-muted">No file</span>
                                         }
                                     }
-                                    else if (col == "Status")
-                                    {
-                                        row.TryGetValue(col, out var statusVal);
-                                        <select class="form-select form-select-sm" value="@statusVal?.ToString()" @onchange='e => OnStatusChanged(row, e.Value?.ToString())'>
-                                            <option value="">No Label</option>
-                                            @foreach (var opt in statusOptions)
-                                            {
-                                                <option value="@opt">@statusIcons.GetValueOrDefault(opt, "🏷️") @opt</option>
-                                            }
-                                            <option value="__custom">+ Add label...</option>
-                                        </select>
-                                    }
-                                    else if (field?.FieldType == "grid_text")
-                                    {
-                                        @RenderGridText(row[col]?.ToString(), field)
-                                    }
+                                else if (col == "Status")
+                                {
+                                    row.TryGetValue(col, out var statusVal);
+                                    <select class="form-select form-select-sm" value="@statusVal?.ToString()" @onchange='e => OnStatusChanged(row, e.Value?.ToString())'>
+                                        <option value="">No Label</option>
+                                        @foreach (var opt in statusOptions)
+                                        {
+                                            <option value="@opt">@statusIcons.GetValueOrDefault(opt, "🏷️") @opt</option>
+                                        }
+                                        <option value="__custom">+ Add label...</option>
+                                    </select>
+                                }
+                                else if (col == "CreatedAt")
+                                {
+                                    <div>@FormatDateTime(row[col]?.ToString())</div>
+                                }
+                                else if (field?.FieldType == "grid_text")
+                                {
+                                    @RenderGridText(row[col]?.ToString(), field)
+                                }
                                     else if (field?.FieldType == "grid_radio")
                                     {
                                         @RenderGridRadio(row[col]?.ToString(), field)
@@ -428,9 +432,35 @@
     async Task UpdateStatus(object idObj, string? status)
     {
         if (idObj == null) return;
-        int id = Convert.ToInt32(idObj);
+        int id;
+        if (idObj is JsonElement je && je.ValueKind == JsonValueKind.Number)
+        {
+            id = je.GetInt32();
+        }
+        else
+        {
+            id = Convert.ToInt32(idObj);
+        }
+
         await Http.PutAsJsonAsync($"api/forms/{FormId}/responses/{id}/status", new { Status = status ?? string.Empty });
-        var row = responses.FirstOrDefault(r => Convert.ToInt32(r["ResponseId"]) == id);
+
+        var row = responses.FirstOrDefault(r =>
+        {
+            if (r.TryGetValue("ResponseId", out var val))
+            {
+                if (val is JsonElement je2 && je2.ValueKind == JsonValueKind.Number)
+                    return je2.GetInt32() == id;
+                try
+                {
+                    return Convert.ToInt32(val) == id;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+            return false;
+        });
         if (row != null) row["Status"] = status;
     }
 
