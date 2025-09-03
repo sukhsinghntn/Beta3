@@ -3,12 +3,14 @@
 @using System.Net
 @using System.Collections.Generic
 @using System.Linq
+@using System.Text.Json
 @using DynamicFormsApp.Shared.Models
 @using Microsoft.AspNetCore.Components
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject CookieHelper CookieHelper
 @inject IJSRuntime JS
+@inject DialogService DialogService
 @implements IAsyncDisposable
 
 <div class="container mt-4">
@@ -76,6 +78,17 @@
                                     {
                                         <div>@FormatDateTime(row[col]?.ToString())</div>
                                     }
+                                    else if (col == "Status")
+                                    {
+                                        <select class="form-select form-select-sm" value="@GetRowStatus(row)" @onchange="e => ChangeStatus(row, e)">
+                                            <option value="">No Label</option>
+                                            @foreach (var opt in statusOptions)
+                                            {
+                                                <option value="@opt">@statusIcons.GetValueOrDefault(opt, "🏷️") @opt</option>
+                                            }
+                                            <option value="__custom">+ Add label...</option>
+                                        </select>
+                                    }
                                     else
                                     {
                                         <div>@row[col]</div>
@@ -105,7 +118,14 @@
     private string responseIdFilter = string.Empty;
     private string submitFilter = string.Empty;
     private string statusFilter = string.Empty;
-    private List<string> statusOptions = new();
+    private List<string> statusOptions = new() { "Approved", "Pending", "Rejected" };
+    private Dictionary<string, string> statusIcons = new()
+    {
+        ["Approved"] = "✅",
+        ["Pending"] = "⏳",
+        ["Rejected"] = "❌"
+    };
+    private List<string> iconChoices = new() { "🏷️", "✅", "⏳", "❌", "⭐", "⚠️", "📌" };
     private IEnumerable<Dictionary<string, object>> FilteredResponses =>
         responses.Where(row =>
             (string.IsNullOrWhiteSpace(responseIdFilter) || row["ResponseId"].ToString().Contains(responseIdFilter, StringComparison.OrdinalIgnoreCase)) &&
@@ -155,12 +175,24 @@
                 columns = columns.Concat(new[] { "ResponderName" }).ToArray();
             }
 
-            statusOptions = responses
-                .Select(r => r.TryGetValue("Status", out var st) ? st?.ToString() ?? string.Empty : string.Empty)
+            statusOptions = statusOptions
+                .Concat(responses.Select(r => r.TryGetValue("Status", out var st) ? st?.ToString() ?? string.Empty : string.Empty))
                 .Where(s => !string.IsNullOrWhiteSpace(s))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(s => s)
                 .ToList();
+
+            var savedIcons = await JS.InvokeAsync<string>("localStorage.getItem", $"form_{FormId}_statusIcons");
+            if (!string.IsNullOrWhiteSpace(savedIcons))
+            {
+                var stored = JsonSerializer.Deserialize<Dictionary<string, string>>(savedIcons) ?? new();
+                foreach (var kv in stored)
+                {
+                    statusIcons[kv.Key] = kv.Value;
+                    if (!statusOptions.Contains(kv.Key)) statusOptions.Add(kv.Key);
+                }
+                statusOptions = statusOptions.OrderBy(s => s).ToList();
+            }
 
             exportModule = await JS.InvokeAsync<IJSObjectReference>("import", "/js/exportHelper.js");
             StateHasChanged();
@@ -196,6 +228,41 @@
         {
             await JS.InvokeVoidAsync("exportTableToPdf", "responsesTable", $"{form?.Name ?? "responses"}.pdf");
         }
+    }
+
+    private string GetRowStatus(Dictionary<string, object> row)
+    {
+        return row.TryGetValue("Status", out var st) ? st?.ToString() ?? string.Empty : string.Empty;
+    }
+
+    private async Task ChangeStatus(Dictionary<string, object> row, ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        var responseId = GetResponseId(row["ResponseId"]);
+        if (value == "__custom")
+        {
+            var result = await DialogService.OpenAsync<StatusLabelDialog>("Add Label", new Dictionary<string, object> { { "Icons", iconChoices } });
+            if (result is StatusLabel custom && !string.IsNullOrWhiteSpace(custom.Label))
+            {
+                if (!statusOptions.Contains(custom.Label)) statusOptions.Add(custom.Label);
+                statusIcons[custom.Label] = custom.Icon;
+                await JS.InvokeVoidAsync("localStorage.setItem", $"form_{FormId}_statusIcons", JsonSerializer.Serialize(statusIcons));
+                row["Status"] = custom.Label;
+                await Http.PutAsJsonAsync($"api/forms/{FormId}/responses/{responseId}/status", new { Status = custom.Label });
+                StateHasChanged();
+            }
+        }
+        else
+        {
+            row["Status"] = value ?? string.Empty;
+            await Http.PutAsJsonAsync($"api/forms/{FormId}/responses/{responseId}/status", new { Status = row["Status"].ToString() });
+            StateHasChanged();
+        }
+    }
+
+    private int GetResponseId(object idVal)
+    {
+        return idVal is JsonElement je && je.ValueKind == JsonValueKind.Number ? je.GetInt32() : Convert.ToInt32(idVal);
     }
 
     public async ValueTask DisposeAsync()
