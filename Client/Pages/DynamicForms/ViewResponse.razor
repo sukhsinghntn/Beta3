@@ -26,9 +26,11 @@
     <label class="form-label">Status</label>
     <select class="form-select w-auto" value="@status" @onchange="OnStatusChanged">
         <option value="">No Label</option>
-        <option value="Approved">Approved</option>
-        <option value="Pending">Pending</option>
-        <option value="Rejected">Rejected</option>
+        @foreach (var opt in statusOptions)
+        {
+            <option value="@opt">@statusIcons.GetValueOrDefault(opt, "🏷️") @opt</option>
+        }
+        <option value="__custom">+ Add label...</option>
     </select>
 </div>
 @if (unavailableInfo != null)
@@ -144,6 +146,13 @@ else
     private string? deletedMessage;
     private DeletedFormInfo? unavailableInfo;
     private string status = string.Empty;
+    private List<string> statusOptions = new() { "Approved", "Pending", "Rejected" };
+    private Dictionary<string, string> statusIcons = new()
+    {
+        ["Approved"] = "✅",
+        ["Pending"] = "⏳",
+        ["Rejected"] = "❌"
+    };
 
     int? PrevId =>
         responseIds != null && responseIds.IndexOf(ResponseId) > 0
@@ -215,6 +224,10 @@ else
         if (response.TryGetValue("Status", out var st))
         {
             status = st?.ToString() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(status) && !statusOptions.Contains(status))
+            {
+                statusOptions.Add(status);
+            }
         }
 
         if (exportModule == null)
@@ -225,8 +238,22 @@ else
 
     async Task OnStatusChanged(ChangeEventArgs e)
     {
-        status = e.Value?.ToString() ?? string.Empty;
-        await Http.PutAsJsonAsync($"api/forms/{FormId}/responses/{ResponseId}/status", new { Status = status });
+        var value = e.Value?.ToString();
+        if (value == "__custom")
+        {
+            var custom = await JS.InvokeAsync<string>("prompt", "Enter custom status label:");
+            if (!string.IsNullOrWhiteSpace(custom))
+            {
+                if (!statusOptions.Contains(custom)) statusOptions.Add(custom);
+                status = custom;
+                await Http.PutAsJsonAsync($"api/forms/{FormId}/responses/{ResponseId}/status", new { Status = status });
+            }
+        }
+        else
+        {
+            status = value ?? string.Empty;
+            await Http.PutAsJsonAsync($"api/forms/{FormId}/responses/{ResponseId}/status", new { Status = status });
+        }
     }
 
     RenderFragment DisplayValue(FormField field) => builder =>

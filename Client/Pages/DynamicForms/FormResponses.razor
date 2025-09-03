@@ -40,6 +40,26 @@
             <button class="btn btn-outline-info me-2" @onclick="DownloadCsv">Download CSV</button>
             <button class="btn btn-outline-info" @onclick="DownloadPdf">Download PDF</button>
         </div>
+        <div class="row g-2 mb-3">
+            <div class="col-md-3">
+                <input class="form-control" placeholder="Filter by Response ID" @bind="responseIdFilter" />
+            </div>
+            @if (columns.Contains("ResponderName"))
+            {
+                <div class="col-md-3">
+                    <input class="form-control" placeholder="Filter by Submitted By" @bind="submitFilter" />
+                </div>
+            }
+            <div class="col-md-3">
+                <select class="form-select" @bind="statusFilter">
+                    <option value="">All Statuses</option>
+                    @foreach (var opt in statusOptions)
+                    {
+                        <option value="@opt">@statusIcons.GetValueOrDefault(opt, "🏷️") @opt</option>
+                    }
+                </select>
+            </div>
+        </div>
         <div class="table-responsive">
             <table id="responsesTable" class="table table-bordered table-hover align-middle">
                 <thead class="table-light">
@@ -52,7 +72,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var row in responses)
+                    @foreach (var row in FilteredResponses)
                     {
                         <tr>
                             @foreach (var col in columns)
@@ -85,11 +105,13 @@
                                     else if (col == "Status")
                                     {
                                         row.TryGetValue(col, out var statusVal);
-                                        <select class="form-select form-select-sm" value="@statusVal?.ToString()" @onchange='e => UpdateStatus(row["ResponseId"], e.Value?.ToString())'>
+                                        <select class="form-select form-select-sm" value="@statusVal?.ToString()" @onchange='e => OnStatusChanged(row, e.Value?.ToString())'>
                                             <option value="">No Label</option>
-                                            <option value="Approved">Approved</option>
-                                            <option value="Pending">Pending</option>
-                                            <option value="Rejected">Rejected</option>
+                                            @foreach (var opt in statusOptions)
+                                            {
+                                                <option value="@opt">@statusIcons.GetValueOrDefault(opt, "🏷️") @opt</option>
+                                            }
+                                            <option value="__custom">+ Add label...</option>
                                         </select>
                                     }
                                     else if (field?.FieldType == "grid_text")
@@ -138,6 +160,21 @@
     private IJSObjectReference? exportModule;
     private string? deletedMessage;
     private DeletedFormInfo? unavailableInfo;
+    private List<string> statusOptions = new() { "Approved", "Pending", "Rejected" };
+    private Dictionary<string, string> statusIcons = new()
+    {
+        ["Approved"] = "✅",
+        ["Pending"] = "⏳",
+        ["Rejected"] = "❌"
+    };
+    private string responseIdFilter = string.Empty;
+    private string submitFilter = string.Empty;
+    private string statusFilter = string.Empty;
+    private IEnumerable<Dictionary<string, object>> FilteredResponses =>
+        responses.Where(row =>
+            (string.IsNullOrWhiteSpace(responseIdFilter) || row["ResponseId"].ToString().Contains(responseIdFilter, StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrWhiteSpace(statusFilter) || (row.TryGetValue("Status", out var st) && (st?.ToString() ?? "") == statusFilter)) &&
+            (string.IsNullOrWhiteSpace(submitFilter) || (row.TryGetValue("ResponderName", out var rn) && rn?.ToString()?.Contains(submitFilter, StringComparison.OrdinalIgnoreCase) == true)));
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -176,6 +213,15 @@
                 return;
             }
             responses = await respData.Content.ReadFromJsonAsync<List<Dictionary<string, object>>>();
+
+            var existingStatuses = responses
+                .Where(r => r.TryGetValue("Status", out var s) && !string.IsNullOrWhiteSpace(s?.ToString()))
+                .Select(r => r["Status"].ToString())
+                .Distinct();
+            foreach (var s in existingStatuses)
+            {
+                if (!statusOptions.Contains(s)) statusOptions.Add(s);
+            }
 
             var fieldKeys = form.Fields
                 .Where(f => f.FieldType != "section" && f.FieldType != "title" && f.FieldType != "image" && f.FieldType != "statictext")
@@ -343,6 +389,25 @@
     {
         public List<string>? Rows { get; set; }
         public List<string>? Columns { get; set; }
+    }
+
+    private async Task OnStatusChanged(Dictionary<string, object> row, string value)
+    {
+        if (value == "__custom")
+        {
+            var custom = await JS.InvokeAsync<string>("prompt", "Enter custom status label:");
+            if (!string.IsNullOrWhiteSpace(custom))
+            {
+                if (!statusOptions.Contains(custom)) statusOptions.Add(custom);
+                await UpdateStatus(row["ResponseId"], custom);
+                row["Status"] = custom;
+            }
+        }
+        else
+        {
+            await UpdateStatus(row["ResponseId"], value);
+            row["Status"] = value;
+        }
     }
 
     async Task UpdateStatus(object idObj, string? status)
