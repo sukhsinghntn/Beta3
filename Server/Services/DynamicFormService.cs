@@ -102,7 +102,7 @@ namespace DynamicFormsApp.Server.Services
                 existing.Fields.Clear();
 
                 var newTable = $"Form_{existing.Id}_{rawName}";
-                var sb = new StringBuilder($"CREATE TABLE [{newTable}] (ResponseId INT IDENTITY(1,1) PRIMARY KEY, CreatedAt DATETIME2 NOT NULL");
+                var sb = new StringBuilder($"CREATE TABLE [{newTable}] (ResponseId INT IDENTITY(1,1) PRIMARY KEY, CreatedAt DATETIME2 NOT NULL, Status NVARCHAR(50) NOT NULL DEFAULT 'Pending'");
                 if (dto.RequireLogin)
                 {
                     sb.Append(", [ResponderName] NVARCHAR(255) NULL");
@@ -276,7 +276,8 @@ namespace DynamicFormsApp.Server.Services
             var sb = new StringBuilder(
                 $"CREATE TABLE [{tableName}] (" +
                 "ResponseId INT IDENTITY(1,1) PRIMARY KEY, " +
-                "CreatedAt DATETIME2 NOT NULL");
+                "CreatedAt DATETIME2 NOT NULL, " +
+                "Status NVARCHAR(50) NOT NULL DEFAULT 'Pending'");
             if (requireLogin)
             {
                 sb.Append(", [ResponderName] NVARCHAR(255) NULL");
@@ -357,9 +358,10 @@ namespace DynamicFormsApp.Server.Services
                 idx++;
             }
 
-            cols = string.IsNullOrEmpty(cols) ? "CreatedAt" : cols + ", CreatedAt";
-            paramNames = string.IsNullOrEmpty(paramNames) ? "@p_created" : paramNames + ", @p_created";
+            cols = string.IsNullOrEmpty(cols) ? "CreatedAt, Status" : cols + ", CreatedAt, Status";
+            paramNames = string.IsNullOrEmpty(paramNames) ? "@p_created, @p_status" : paramNames + ", @p_created, @p_status";
             sqlParams.Add(new SqlParameter("@p_created", DateTime.UtcNow));
+            sqlParams.Add(new SqlParameter("@p_status", "Pending"));
 
             if (form.RequireLogin)
             {
@@ -705,6 +707,35 @@ namespace DynamicFormsApp.Server.Services
             return ids;
         }
 
+        public async Task UpdateResponseStatusAsync(int formId, int responseId, string status, string user)
+        {
+            if (!await HasResponseAccessAsync(formId, user))
+            {
+                throw new UnauthorizedAccessException();
+            }
+
+            var form = await _db.Forms.FindAsync(formId)
+                       ?? throw new InvalidOperationException("Form not found");
+            var rawName = SanitizeKey(form.Name);
+            var tableName = $"Form_{formId}_{rawName}";
+
+            using var conn = _db.Database.GetDbConnection();
+            if (conn.State != System.Data.ConnectionState.Open)
+                await conn.OpenAsync();
+
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"UPDATE [{tableName}] SET Status=@status WHERE ResponseId=@id;";
+            var p1 = cmd.CreateParameter();
+            p1.ParameterName = "@status";
+            p1.Value = status ?? string.Empty;
+            cmd.Parameters.Add(p1);
+            var p2 = cmd.CreateParameter();
+            p2.ParameterName = "@id";
+            p2.Value = responseId;
+            cmd.Parameters.Add(p2);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
         private string MapToSqlType(string fieldType) => fieldType switch
         {
             "number" => "FLOAT",
@@ -721,6 +752,7 @@ namespace DynamicFormsApp.Server.Services
             "textarea" => "NVARCHAR(MAX)",
             "grid_radio" => "NVARCHAR(MAX)",    // JSON object
             "grid_checkbox" => "NVARCHAR(MAX)", // JSON object
+            "grid_text" => "NVARCHAR(MAX)",     // JSON array of rows
             "scale" => "INT",
             _ => "NVARCHAR(MAX)"
         };
