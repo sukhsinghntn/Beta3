@@ -3,6 +3,7 @@
 @using System.Net
 @using System.Text
 @using System.Text.Json
+@using System.Linq
 @using System.Collections.Generic
 @using System
 @using DynamicFormsApp.Shared.Models
@@ -84,11 +85,24 @@
                                     else if (col == "Status")
                                     {
                                         row.TryGetValue(col, out var statusVal);
-                                        <input list="statusOptions" class="form-control form-control-sm" value="@statusVal?.ToString()" @onchange='e => UpdateStatus(row["ResponseId"], e.Value?.ToString())' />
+                                        <select class="form-select form-select-sm" value="@statusVal?.ToString()" @onchange='e => UpdateStatus(row["ResponseId"], e.Value?.ToString())'>
+                                            <option value="">No Label</option>
+                                            <option value="Approved">Approved</option>
+                                            <option value="Pending">Pending</option>
+                                            <option value="Rejected">Rejected</option>
+                                        </select>
                                     }
                                     else if (field?.FieldType == "grid_text")
                                     {
                                         @RenderGridText(row[col]?.ToString(), field)
+                                    }
+                                    else if (field?.FieldType == "grid_radio")
+                                    {
+                                        @RenderGridRadio(row[col]?.ToString(), field)
+                                    }
+                                    else if (field?.FieldType == "grid_checkbox")
+                                    {
+                                        @RenderGridCheckbox(row[col]?.ToString(), field)
                                     }
                                     else if (field?.FieldType == "date")
                                     {
@@ -100,7 +114,7 @@
                                     }
                                     else
                                     {
-                                        <div style="white-space: pre-wrap;">@row[col]</div>
+                                        <div style="white-space: pre-wrap;">@FormatValue(row[col])</div>
                                     }
                                 </td>
                             }
@@ -111,11 +125,6 @@
                     }
                 </tbody>
             </table>
-            <datalist id="statusOptions">
-                <option value="Approved"></option>
-                <option value="Pending"></option>
-                <option value="Rejected"></option>
-            </datalist>
         </div>
     }
 </div>
@@ -245,6 +254,89 @@
         {
             return (MarkupString)val;
         }
+    }
+
+    private MarkupString RenderGridRadio(string? val, FormField field)
+    {
+        if (string.IsNullOrWhiteSpace(val)) return (MarkupString)string.Empty;
+        try
+        {
+            var selections = JsonSerializer.Deserialize<Dictionary<string, string>>(val) ?? new();
+            var opts = JsonSerializer.Deserialize<GridOptions>(field.OptionsJson ?? "{}");
+            var rows = opts?.Rows ?? new List<string>();
+            var cols = opts?.Columns ?? new List<string>();
+            var sb = new StringBuilder("<table class='table table-bordered table-sm mb-0'><thead><tr><th></th>");
+            foreach (var c in cols)
+                sb.Append($"<th>{WebUtility.HtmlEncode(c)}</th>");
+            sb.Append("</tr></thead><tbody>");
+            foreach (var r in rows)
+            {
+                sb.Append("<tr>");
+                sb.Append($"<td><strong>{WebUtility.HtmlEncode(r)}</strong></td>");
+                foreach (var c in cols)
+                {
+                    var mark = selections.TryGetValue(r, out var sel) && sel == c ? "&#10003;" : string.Empty;
+                    sb.Append($"<td>{mark}</td>");
+                }
+                sb.Append("</tr>");
+            }
+            sb.Append("</tbody></table>");
+            return new MarkupString(sb.ToString());
+        }
+        catch
+        {
+            return (MarkupString)val;
+        }
+    }
+
+    private MarkupString RenderGridCheckbox(string? val, FormField field)
+    {
+        if (string.IsNullOrWhiteSpace(val)) return (MarkupString)string.Empty;
+        try
+        {
+            var selections = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(val) ?? new();
+            var opts = JsonSerializer.Deserialize<GridOptions>(field.OptionsJson ?? "{}");
+            var rows = opts?.Rows ?? new List<string>();
+            var cols = opts?.Columns ?? new List<string>();
+            var sb = new StringBuilder("<table class='table table-bordered table-sm mb-0'><thead><tr><th></th>");
+            foreach (var c in cols)
+                sb.Append($"<th>{WebUtility.HtmlEncode(c)}</th>");
+            sb.Append("</tr></thead><tbody>");
+            foreach (var r in rows)
+            {
+                sb.Append("<tr>");
+                sb.Append($"<td><strong>{WebUtility.HtmlEncode(r)}</strong></td>");
+                foreach (var c in cols)
+                {
+                    var mark = selections.TryGetValue(r, out var list) && list.Contains(c) ? "&#10003;" : string.Empty;
+                    sb.Append($"<td>{mark}</td>");
+                }
+                sb.Append("</tr>");
+            }
+            sb.Append("</tbody></table>");
+            return new MarkupString(sb.ToString());
+        }
+        catch
+        {
+            return (MarkupString)val;
+        }
+    }
+
+    private string FormatValue(object? raw)
+    {
+        if (raw is JsonElement je)
+        {
+            if (je.ValueKind == JsonValueKind.Array)
+            {
+                return string.Join(", ", je.EnumerateArray().Select(e => e.ToString()));
+            }
+            if (je.ValueKind == JsonValueKind.Object)
+            {
+                return je.GetRawText();
+            }
+            return je.ToString();
+        }
+        return raw?.ToString() ?? string.Empty;
     }
 
     private class GridOptions

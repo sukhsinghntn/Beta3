@@ -24,13 +24,13 @@
 </div>
 <div class="mb-3">
     <label class="form-label">Status</label>
-    <input list="statusOptions" class="form-control w-auto" value="@status" @onchange="OnStatusChanged" />
+    <select class="form-select w-auto" value="@status" @onchange="OnStatusChanged">
+        <option value="">No Label</option>
+        <option value="Approved">Approved</option>
+        <option value="Pending">Pending</option>
+        <option value="Rejected">Rejected</option>
+    </select>
 </div>
-<datalist id="statusOptions">
-    <option value="Approved"></option>
-    <option value="Pending"></option>
-    <option value="Rejected"></option>
-</datalist>
 @if (unavailableInfo != null)
 {
     <FormUnavailableDisplay Info="@unavailableInfo" />
@@ -319,6 +319,74 @@ else
                 }
             }
         }
+        else if (field.FieldType == "grid_radio")
+        {
+            if (!string.IsNullOrWhiteSpace(val))
+            {
+                try
+                {
+                    var selections = JsonSerializer.Deserialize<Dictionary<string, string>>(val) ?? new();
+                    var opts = JsonSerializer.Deserialize<GridOptions>(field.OptionsJson ?? "{}");
+                    var rows = opts?.Rows ?? new List<string>();
+                    var cols = opts?.Columns ?? new List<string>();
+                    var sb = new StringBuilder("<table class='table table-bordered table-sm mb-0'><thead><tr><th></th>");
+                    foreach (var c in cols)
+                        sb.Append($"<th>{WebUtility.HtmlEncode(c)}</th>");
+                    sb.Append("</tr></thead><tbody>");
+                    foreach (var r in rows)
+                    {
+                        sb.Append("<tr>");
+                        sb.Append($"<td><strong>{WebUtility.HtmlEncode(r)}</strong></td>");
+                        foreach (var c in cols)
+                        {
+                            var mark = selections.TryGetValue(r, out var sel) && sel == c ? "&#10003;" : string.Empty;
+                            sb.Append($"<td>{mark}</td>");
+                        }
+                        sb.Append("</tr>");
+                    }
+                    sb.Append("</tbody></table>");
+                    builder.AddMarkupContent(14, sb.ToString());
+                }
+                catch
+                {
+                    builder.AddContent(15, val);
+                }
+            }
+        }
+        else if (field.FieldType == "grid_checkbox")
+        {
+            if (!string.IsNullOrWhiteSpace(val))
+            {
+                try
+                {
+                    var selections = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(val) ?? new();
+                    var opts = JsonSerializer.Deserialize<GridOptions>(field.OptionsJson ?? "{}");
+                    var rows = opts?.Rows ?? new List<string>();
+                    var cols = opts?.Columns ?? new List<string>();
+                    var sb = new StringBuilder("<table class='table table-bordered table-sm mb-0'><thead><tr><th></th>");
+                    foreach (var c in cols)
+                        sb.Append($"<th>{WebUtility.HtmlEncode(c)}</th>");
+                    sb.Append("</tr></thead><tbody>");
+                    foreach (var r in rows)
+                    {
+                        sb.Append("<tr>");
+                        sb.Append($"<td><strong>{WebUtility.HtmlEncode(r)}</strong></td>");
+                        foreach (var c in cols)
+                        {
+                            var mark = selections.TryGetValue(r, out var list) && list.Contains(c) ? "&#10003;" : string.Empty;
+                            sb.Append($"<td>{mark}</td>");
+                        }
+                        sb.Append("</tr>");
+                    }
+                    sb.Append("</tbody></table>");
+                    builder.AddMarkupContent(16, sb.ToString());
+                }
+                catch
+                {
+                    builder.AddContent(17, val);
+                }
+            }
+        }
         else if (field.FieldType == "date")
         {
             if (DateTime.TryParse(val, out var dt))
@@ -335,7 +403,7 @@ else
         }
         else
         {
-            builder.AddContent(9, val);
+            builder.AddContent(9, FormatValue(valObj));
         }
     };
 
@@ -361,6 +429,23 @@ else
         return lower.EndsWith(".jpg") || lower.EndsWith(".jpeg") ||
                lower.EndsWith(".png") || lower.EndsWith(".gif") ||
                lower.EndsWith(".bmp") || lower.EndsWith(".webp");
+    }
+
+    string FormatValue(object? val)
+    {
+        if (val is JsonElement je)
+        {
+            if (je.ValueKind == JsonValueKind.Array)
+            {
+                return string.Join(", ", je.EnumerateArray().Select(e => e.ToString()));
+            }
+            if (je.ValueKind == JsonValueKind.Object)
+            {
+                return je.GetRawText();
+            }
+            return je.ToString();
+        }
+        return val?.ToString() ?? string.Empty;
     }
 
     string ValueAsString(FormField field)
@@ -398,6 +483,32 @@ else
             }
             return val;
         }
+        if (field.FieldType == "grid_radio")
+        {
+            if (!string.IsNullOrWhiteSpace(val))
+            {
+                try
+                {
+                    var dict = JsonSerializer.Deserialize<Dictionary<string, string>>(val) ?? new();
+                    return string.Join(" | ", dict.Select(kv => $"{kv.Key}:{kv.Value}"));
+                }
+                catch { }
+            }
+            return val;
+        }
+        if (field.FieldType == "grid_checkbox")
+        {
+            if (!string.IsNullOrWhiteSpace(val))
+            {
+                try
+                {
+                    var dict = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(val) ?? new();
+                    return string.Join(" | ", dict.Select(kv => $"{kv.Key}:{string.Join(\", \", kv.Value)}"));
+                }
+                catch { }
+            }
+            return val;
+        }
         if (field.FieldType == "image" || field.FieldType == "statictext")
         {
             return string.Empty;
@@ -417,7 +528,7 @@ else
             return val;
         }
 
-        return val;
+        return FormatValue(valObj);
     }
 
     private class GridOptions

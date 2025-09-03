@@ -102,7 +102,7 @@ namespace DynamicFormsApp.Server.Services
                 existing.Fields.Clear();
 
                 var newTable = $"Form_{existing.Id}_{rawName}";
-                var sb = new StringBuilder($"CREATE TABLE [{newTable}] (ResponseId INT IDENTITY(1,1) PRIMARY KEY, CreatedAt DATETIME2 NOT NULL, Status NVARCHAR(50) NOT NULL DEFAULT 'Pending'");
+                var sb = new StringBuilder($"CREATE TABLE [{newTable}] (ResponseId INT IDENTITY(1,1) PRIMARY KEY, CreatedAt DATETIME2 NOT NULL, Status NVARCHAR(50) NULL");
                 if (dto.RequireLogin)
                 {
                     sb.Append(", [ResponderName] NVARCHAR(255) NULL");
@@ -277,7 +277,7 @@ namespace DynamicFormsApp.Server.Services
                 $"CREATE TABLE [{tableName}] (" +
                 "ResponseId INT IDENTITY(1,1) PRIMARY KEY, " +
                 "CreatedAt DATETIME2 NOT NULL, " +
-                "Status NVARCHAR(50) NOT NULL DEFAULT 'Pending'");
+                "Status NVARCHAR(50) NULL");
             if (requireLogin)
             {
                 sb.Append(", [ResponderName] NVARCHAR(255) NULL");
@@ -361,7 +361,7 @@ namespace DynamicFormsApp.Server.Services
             cols = string.IsNullOrEmpty(cols) ? "CreatedAt, Status" : cols + ", CreatedAt, Status";
             paramNames = string.IsNullOrEmpty(paramNames) ? "@p_created, @p_status" : paramNames + ", @p_created, @p_status";
             sqlParams.Add(new SqlParameter("@p_created", DateTime.UtcNow));
-            sqlParams.Add(new SqlParameter("@p_status", "Pending"));
+            sqlParams.Add(new SqlParameter("@p_status", DBNull.Value));
 
             if (form.RequireLogin)
             {
