@@ -84,7 +84,7 @@
                                     else if (col == "Status")
                                     {
                                         row.TryGetValue(col, out var statusVal);
-                                        <input list="statusOptions" class="form-control form-control-sm" value="@statusVal?.ToString()" @onchange="e => UpdateStatus(row["ResponseId"], e.Value?.ToString())" />
+                                        <input list="statusOptions" class="form-control form-control-sm" value="@statusVal?.ToString()" @onchange='e => UpdateStatus(row["ResponseId"], e.Value?.ToString())' />
                                     }
                                     else if (field?.FieldType == "grid_text")
                                     {
