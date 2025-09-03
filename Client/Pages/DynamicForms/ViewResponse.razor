@@ -503,7 +503,7 @@ else
                 try
                 {
                     var dict = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(val) ?? new();
-                    return string.Join(" | ", dict.Select(kv => $"{kv.Key}:{string.Join(\", \", kv.Value)}"));
+                    return string.Join(" | ", dict.Select(kv => $"{kv.Key}:{string.Join(", ", kv.Value)}"));
                 }
                 catch { }
             }
