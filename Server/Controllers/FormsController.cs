@@ -98,6 +98,22 @@ namespace DynamicFormsApp.Server.Controllers
             return Ok(row);
         }
 
+        public class StatusUpdate
+        {
+            public string Status { get; set; } = string.Empty;
+        }
+
+        [HttpPut("{id}/responses/{responseId}/status")]
+        public async Task<IActionResult> UpdateResponseStatus(int id, int responseId, [FromBody] StatusUpdate update)
+        {
+            if (!Request.Cookies.TryGetValue("userName", out var user) || string.IsNullOrEmpty(user))
+            {
+                return Unauthorized();
+            }
+            await _svc.UpdateResponseStatusAsync(id, responseId, update.Status, user);
+            return NoContent();
+        }
+
 
         // GET /api/forms/{id}
         [HttpGet("{id}")]
