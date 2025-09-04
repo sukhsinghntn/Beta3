@@ -6,6 +6,8 @@ using DynamicFormsApp.Server.Services;
 using DynamicFormsApp.Server.Data;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Http;
+using System;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +29,13 @@ builder.Services.AddDbContext<AppDbContext>(opts =>
 
 // Dynamic form service
 builder.Services.AddScoped<DynamicFormService>();
+builder.Services.AddScoped<ComponentService>();
+builder.Services.AddHttpClient<ComponentServiceProxy>((sp, client) =>
+{
+    var accessor = sp.GetRequiredService<IHttpContextAccessor>();
+    var request = accessor.HttpContext?.Request;
+    client.BaseAddress = new Uri($"{request?.Scheme}://{request?.Host}");
+});
 
 // CORS policy to allow any origin, method, and header
 builder.Services.AddCors(options =>
