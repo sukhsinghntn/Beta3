@@ -18,6 +18,11 @@
     <link href="manifest.json" rel="manifest" />
     <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png" />
     <HeadOutlet @rendermode="@InteractiveWebAssembly" />
+    <script>
+        if (typeof SVGElement === 'undefined') {
+            window.SVGElement = window.Element;
+        }
+    </script>
 </head>
 
 <body data-bs-theme="dark">
@@ -29,11 +34,6 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="js/sortable-wrapper.js?v=@AppInfo.Version"></script>
     <script src="js/dragdrop-wrapper.js?v=@AppInfo.Version"></script>
-    <script>
-        if (typeof SVGElement === 'undefined') {
-            window.SVGElement = window.Element;
-        }
-    </script>
     <script src="https://cdn.jsdelivr.net/npm/intro.js@7.2.0/minified/intro.min.js"></script>
     <script src="js/builder-tour.js?v=@AppInfo.Version"></script>
     <script src="js/resize-image.js?v=@AppInfo.Version"></script>
