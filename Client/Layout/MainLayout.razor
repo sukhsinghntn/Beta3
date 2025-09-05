@@ -218,5 +218,18 @@
             username = ValidUser.DisplayName;
         }
         waitingforuserload = true; // Mark the user data as loaded
+        if (!string.IsNullOrEmpty(username))
+        {
+            await ShowTourAsync();
+        }
+    }
+
+    private async Task ShowTourAsync()
+    {
+        var seen = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "df.tour.seen");
+        if (string.IsNullOrEmpty(seen))
+        {
+            await DialogService.OpenAsync<UserTour>("Welcome", options: new DialogOptions { Width = "600px" });
+        }
     }
 }

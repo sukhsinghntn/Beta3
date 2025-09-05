@@ -138,10 +138,13 @@ namespace DynamicFormsApp.Server.Services
                 searcher.PropertiesToLoad.Add("sAMAccountName");
                 searcher.PropertiesToLoad.Add("displayName");
                 searcher.PropertiesToLoad.Add("mail");
+                searcher.PropertiesToLoad.Add("userAccountControl");
                 foreach (SearchResult result in searcher.FindAll())
                 {
                     if (result.Properties["sAMAccountName"].Count == 0) continue;
                     if (result.Properties["mail"].Count == 0) continue;
+                    var uac = result.Properties["userAccountControl"].Count > 0 ? result.Properties["userAccountControl"][0].ToString() : string.Empty;
+                    if (uac == "514" || uac == "66048") continue;
                     var user = new UserModel
                     {
                         UserName = result.Properties["sAMAccountName"][0].ToString()!,
@@ -251,10 +254,13 @@ namespace DynamicFormsApp.Server.Services
                 searcher.PropertiesToLoad.Add("sAMAccountName");
                 searcher.PropertiesToLoad.Add("displayName");
                 searcher.PropertiesToLoad.Add("mail");
+                searcher.PropertiesToLoad.Add("userAccountControl");
                 foreach (SearchResult result in searcher.FindAll())
                 {
                     if (result.Properties["sAMAccountName"].Count == 0) continue;
                     if (result.Properties["mail"].Count == 0) continue;
+                    var uac = result.Properties["userAccountControl"].Count > 0 ? result.Properties["userAccountControl"][0].ToString() : string.Empty;
+                    if (uac == "514" || uac == "66048") continue;
                     var user = new UserModel
                     {
                         UserName = result.Properties["sAMAccountName"][0].ToString()!,

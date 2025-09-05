@@ -88,3 +88,58 @@ window.focusLastInput = (container) => {
 window.triggerClick = (el) => {
     if (el) el.click();
 };
+
+window.initToolboxPreview = () => {
+    document.querySelectorAll('.draggable-field').forEach(el => {
+        if (el.dataset.previewInit === 'true') return;
+        el.dataset.previewInit = 'true';
+        const preview = el.querySelector('.toolbox-preview');
+        if (!preview) return;
+
+        const offset = 4;
+
+        el.addEventListener('mouseenter', e => {
+            document.body.appendChild(preview);
+            preview.style.display = 'block';
+            preview.style.top = (e.clientY + offset) + 'px';
+            preview.style.left = (e.clientX + offset) + 'px';
+        });
+
+        el.addEventListener('mousemove', e => {
+            preview.style.top = (e.clientY + offset) + 'px';
+            preview.style.left = (e.clientX + offset) + 'px';
+        });
+
+        el.addEventListener('mouseleave', () => {
+            preview.style.display = 'none';
+        });
+    });
+};
+
+window.compressImage = (input, maxBytes) => {
+    if (!input || !input.files || input.files.length === 0) return null;
+    const file = input.files[0];
+    if (file.size <= maxBytes) {
+        return file.arrayBuffer().then(buf => new Uint8Array(buf));
+    }
+    return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                canvas.toBlob(async blob => {
+                    if (!blob) { resolve(null); return; }
+                    const arr = new Uint8Array(await blob.arrayBuffer());
+                    resolve(arr);
+                }, file.type, 0.8);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+};

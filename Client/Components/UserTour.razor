@@ -1,0 +1,22 @@
+@inject IJSRuntime JSRuntime
+@inject DialogService DialogService
+
+<RadzenCard Style="padding: 1rem; max-width: 600px;">
+    <RadzenHeading Size="H4" Text="Welcome to Dynamic Forms" />
+    <p>Here's a quick tour of what you can do:</p>
+    <ul>
+        <li>Create forms with drag-and-drop components.</li>
+        <li>Preview forms in full-screen before publishing.</li>
+        <li>Reuse saved components across your department.</li>
+        <li>Label responses with custom statuses and icons.</li>
+    </ul>
+    <RadzenButton Text="Get Started" Click="@Close" Style="margin-top: 1rem" ButtonStyle="ButtonStyle.Primary" />
+</RadzenCard>
+
+@code {
+    private async Task Close()
+    {
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "df.tour.seen", "1");
+        DialogService.Close(true);
+    }
+}

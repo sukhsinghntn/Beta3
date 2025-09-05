@@ -14,15 +14,13 @@
 <h2 class="mb-4">Form Builder</h2>
 
 <div class="mb-4">
-    <label class="form-label">Form Name</label>
     <input type="text"
            class="form-control form-control-lg"
-           placeholder="Enter your form title"
+           placeholder="Untitled form"
            @bind="formName" />
 </div>
 <div class="mb-4">
-    <label class="form-label">Description</label>
-    <textarea class="form-control" placeholder="Enter a description" @bind="formDescription"></textarea>
+    <textarea class="form-control" placeholder="Form description" @bind="formDescription"></textarea>
 </div>
 
 <div class="form-check form-switch mb-4">
@@ -58,9 +56,6 @@
                            @bind="field.Label" />
                 </div>
                 <div class="btn-group">
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => DuplicateField(index)">
-                        <span class="material-icons">content_copy</span>
-                    </button>
                     <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveField(field)">
                         <span class="material-icons">delete</span>
                     </button>
@@ -166,21 +161,6 @@
     void RemoveField(DesignerField field)
     {
         fields.Remove(field);
-        JS.InvokeVoidAsync("initListSortable", "#simple-fields", objRef!);
-    }
-
-    void DuplicateField(int index)
-    {
-        var src = fields[index];
-        var copy = new DesignerField
-        {
-            Key = string.Empty,
-            Label = src.Label,
-            FieldType = src.FieldType,
-            Options = src.Options,
-            IsRequired = src.IsRequired
-        };
-        fields.Insert(index + 1, copy);
         JS.InvokeVoidAsync("initListSortable", "#simple-fields", objRef!);
     }
 
